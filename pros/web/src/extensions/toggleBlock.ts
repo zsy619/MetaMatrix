@@ -110,12 +110,14 @@ export const ToggleBlock = Node.create({
       label.spellcheck = false
       label.setAttribute('role', 'textbox')
       label.setAttribute('aria-label', '折叠标题')
+      label.title = '折叠块的标题，点进去直接改字'
       label.textContent = current.attrs.summary || '折叠标题'
 
       const syncCaret = () => {
         const open = current.attrs.open !== false
         caret.setAttribute('aria-expanded', open ? 'true' : 'false')
-        caret.setAttribute('aria-label', open ? '折叠' : '展开')
+        caret.setAttribute('aria-label', open ? '收起下面的内容' : '展开下面的内容')
+        caret.title = open ? '收起下面的内容' : '展开下面的内容'
       }
       syncCaret()
 

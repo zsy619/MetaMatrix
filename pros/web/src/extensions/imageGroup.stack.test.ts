@@ -2,9 +2,10 @@
 /** 三张图拖到上沿或下沿，排成 12（左一右二）或 21（左二右一）。 */
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
+import { NodeSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { ImageGroup } from './imageGroup'
-import { reorderInGroup, setGroupLayout, stackInGroup } from './imageGroupOps'
+import { insertImagesBeside, reorderInGroup, setGroupLayout, stackInGroup } from './imageGroupOps'
 import { deepOptimizeDocument } from '../utils/rteDeepOptimize'
 import { RteImage } from './rteImage'
 
@@ -137,6 +138,46 @@ describe('图片组 12 / 21', () => {
       'https://example.com/b.png',
       'https://example.com/d.png',
       'https://example.com/c.png',
+    ])
+  })
+
+  it('从左一右二里删掉一张后改回横排', () => {
+    const ed = makeEditor(groupHtml('12'))
+    const positions = imagePositions(ed)
+    ed.view.dispatch(ed.state.tr.setSelection(NodeSelection.create(ed.state.doc, positions[2]!)))
+    expect(ed.commands.deleteSelection()).toBe(true)
+    expect(ed.state.doc.firstChild?.type.name).toBe('imageGroup')
+    expect(ed.state.doc.firstChild?.attrs.layout).toBe('row')
+    expect(srcs(ed)).toEqual(['https://example.com/a.png', 'https://example.com/b.png'])
+  })
+
+  it('一组图全被藏起时重新显示', () => {
+    const ed = makeEditor('<p></p>')
+    ed.commands.setContent(
+      `<div data-type="image-group" data-align="center"><div class="rte-image-group-row"><img src="https://example.com/a.png" data-concealed="1"><img src="https://example.com/b.png" data-concealed="1"></div></div>`,
+    )
+    const hidden = srcs(ed).length
+    expect(hidden).toBe(2)
+    let concealed = 0
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'image' && node.attrs.concealed) concealed += 1
+    })
+    expect(concealed).toBe(0)
+  })
+
+  it('往自定义比例的图片组加图时，原来的宽比还在', () => {
+    const ed = makeEditor(
+      `<div data-type="image-group" data-align="center" data-ratio-mode="custom" data-ratios="2:1"><div class="rte-image-group-row"><img src="https://example.com/a.png"><img src="https://example.com/b.png"></div></div>`,
+    )
+    const extra = ed.schema.nodes.image!.create({ src: 'https://example.com/c.png' })
+    expect(insertImagesBeside(ed.view, imagePositions(ed)[0]!, 'right', [extra])).toBe(true)
+    expect(ed.state.doc.firstChild?.childCount).toBe(3)
+    expect(ed.state.doc.firstChild?.attrs.ratioMode).toBe('custom')
+    expect(ed.state.doc.firstChild?.attrs.ratios).toBe('2:1:1')
+    expect(srcs(ed)).toEqual([
+      'https://example.com/a.png',
+      'https://example.com/c.png',
+      'https://example.com/b.png',
     ])
   })
 

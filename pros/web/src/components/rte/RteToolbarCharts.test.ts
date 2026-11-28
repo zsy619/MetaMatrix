@@ -28,6 +28,10 @@ async function mountEditor() {
     templateId: 'y-model',
     title: 'fixture',
   } as unknown as CanvasDocumentJSON
+  // 最大化工具栏只渲染当前功能区（ribbon）这一组。
+  // 本文件只测「图表」组，所以先把它设为当前功能区，否则默认停在「编辑」组，
+  // 图表按钮根本不会进 DOM。
+  localStorage.setItem('rte-ribbon-tab', 'charts')
   const wrapper = mount(RichTextEditor, {
     props: { modelValue: FIXTURE, panelId: 'panel-a', expanded: true },
     global: { plugins: [pinia] },
@@ -70,7 +74,9 @@ describe('工具栏「图表」分组', () => {
   it('工具栏直接露出 9 个一级分类按钮', async () => {
     const wrapper = await mountEditor()
     for (const group of CHART_GROUPS) {
-      const button = wrapper.find(`button[title="插入${group.label}图表"]`)
+      // 生产里的 title 是「插入基础图表：折线 / 柱状 / …」，带分组说明；
+      // 这里用前缀匹配，避免提示文案变化就打断测试。
+      const button = wrapper.find(`button[title^="插入${group.label}图表"]`)
       expect(button.exists()).toBe(true)
     }
     // 旧的总入口按钮没有了
@@ -80,13 +86,13 @@ describe('工具栏「图表」分组', () => {
 
   it('点某个分类下拉只列该分类下的图表类型', async () => {
     const wrapper = await mountEditor()
-    const button = wrapper.find('button[title="插入基础图表"]')
+    const button = wrapper.find('button[title^="插入基础图表"]')
     await button.trigger('click')
     await flushPromises()
     await nextTick()
     const menu = document.querySelector('.rte-menu-echarts')
     expect(menu).toBeTruthy()
-    const cats = menu?.querySelectorAll('.rte-menu-cat') || []
+    const cats = menu?.querySelectorAll('.rte-chart-menu__row') || []
     // 基础组 5 类（不是全部 39 类）
     expect(cats.length).toBe(5)
     const labels = Array.from(cats).map((el) => el.textContent || '')
@@ -97,31 +103,31 @@ describe('工具栏「图表」分组', () => {
 
   it('3D·GL 是独立下拉，只列 3D/GL 的类型', async () => {
     const wrapper = await mountEditor()
-    const button = wrapper.find('button[title="插入3D·GL图表"]')
+    const button = wrapper.find('button[title^="插入3D·GL图表"]')
     expect(button.exists()).toBe(true)
     await button.trigger('click')
     await flushPromises()
     await nextTick()
     const menu = document.querySelector('.rte-menu-echarts')
-    const cats = menu?.querySelectorAll('.rte-menu-cat') || []
+    const cats = menu?.querySelectorAll('.rte-chart-menu__row') || []
     expect(cats.length).toBe(11)
     wrapper.unmount()
   })
 
   it('再点一次同一个按钮收起下拉；同一时间只开一个分类下拉', async () => {
     const wrapper = await mountEditor()
-    const basic = wrapper.find('button[title="插入基础图表"]')
+    const basic = wrapper.find('button[title^="插入基础图表"]')
     await basic.trigger('click')
     await flushPromises()
     await nextTick()
     expect(document.querySelectorAll('.rte-menu-echarts').length).toBe(1)
     // 换成「统计」：基础的下拉收起，只剩一个
-    const stats = wrapper.find('button[title="插入统计图表"]')
+    const stats = wrapper.find('button[title^="插入统计图表"]')
     await stats.trigger('click')
     await flushPromises()
     await nextTick()
     expect(document.querySelectorAll('.rte-menu-echarts').length).toBe(1)
-    const cats = document.querySelectorAll('.rte-menu-echarts .rte-menu-cat')
+    const cats = document.querySelectorAll('.rte-menu-echarts .rte-chart-menu__row')
     expect(cats.length).toBe(5)
     // 再点一次「统计」→ 收起
     await stats.trigger('click')
@@ -133,16 +139,16 @@ describe('工具栏「图表」分组', () => {
 
   it('点类别展开子类型，点子类型插入图表块', async () => {
     const wrapper = await mountEditor()
-    const button = wrapper.find('button[title="插入基础图表"]')
+    const button = wrapper.find('button[title^="插入基础图表"]')
     await button.trigger('click')
     await flushPromises()
     await nextTick()
     const menu = document.querySelector('.rte-menu-echarts') as HTMLElement
-    const firstCat = menu.querySelector('.rte-menu-cat') as HTMLElement
+    const firstCat = menu.querySelector('.rte-chart-menu__row') as HTMLElement
     firstCat.click()
     await flushPromises()
     await nextTick()
-    const subs = menu.querySelectorAll('.rte-menu-sub button')
+    const subs = menu.querySelectorAll('.rte-chart-menu__sub-row')
     expect(subs.length).toBeGreaterThan(0)
     ;(subs[0] as HTMLElement).click()
     await flushPromises()

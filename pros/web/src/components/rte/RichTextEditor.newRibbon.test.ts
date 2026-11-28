@@ -47,14 +47,25 @@ function editorOf(wrapper: ReturnType<typeof mount>): Editor {
 }
 
 async function openRibbon(wrapper: ReturnType<typeof mount>, label: string) {
-  const tab = wrapper.findAll('button.rte-ribbon-tab').find((button) => button.text() === label)
+  // 功能区栏目现在显示短标题（2-4 字），完整名称放在 data-ribbon-label 与悬停气泡里。
+  const tab = wrapper
+    .findAll('button.rte-ribbon-tab')
+    .find(
+      (button) =>
+        button.text() === label || button.attributes('data-ribbon-label') === label,
+    )
   expect(tab, `栏目 ${label}`).toBeTruthy()
   await tab!.trigger('click')
   await nextTick()
 }
 
 function toolButton(wrapper: ReturnType<typeof mount>, label: string) {
-  return wrapper.findAll('button.rte-tool').find((button) => (button.text() || '').includes(label))
+  const buttons = wrapper.findAll('button.rte-tool')
+  // 表格等按钮会按上下文显示「表操作 / 插表格」，稳定的语义名称在 aria-label。
+  // 只对无障碍名称做精确匹配，随后完全沿用原来的文本查找；若对 aria-label
+  // 也做模糊匹配，「全角」会提前命中标题为「半角、全角、空格和按行整理」的总菜单。
+  return buttons.find((button) => button.attributes('aria-label') === label)
+    ?? buttons.find((button) => (button.text() || '').includes(label))
 }
 
 async function clickTool(wrapper: ReturnType<typeof mount>, label: string) {
@@ -316,7 +327,7 @@ describe('新功能区按钮', () => {
     expect(editor.getHTML()).toContain('data-zebra="1"')
     await clickTool(wrapper, '均分列')
     expect(editor.getHTML()).toContain('colwidth="160"')
-    await clickTool(wrapper, '格公式')
+    await clickTool(wrapper, '求和')
     expect(editor.getText()).toContain('=SUM(ABOVE)')
     await clickTool(wrapper, '冻结表头')
     expect(wrapper.classes()).toContain('is-table-sticky')
@@ -326,6 +337,86 @@ describe('新功能区按钮', () => {
     await clickTool(wrapper, '行列')
     await clickMenu('向下插入行')
     expect(editor.getHTML().split('<tr').length - 1).toBe(beforeRows + 1)
+    wrapper.unmount()
+  })
+
+  it('表格菜单的数量框默认 1，填几就插入几行或几列', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent('<table><tbody><tr><td><p>甲</p></td></tr></tbody></table>')
+    let cell = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (cell < 0 && node.isText && node.text === '甲') cell = pos
+    })
+    editor.commands.setTextSelection(cell)
+    await openRibbon(wrapper, '表格')
+    await clickTool(wrapper, '表格')
+    const insertGroup = [...document.querySelectorAll('.rte-table-menu button')].find((button) => (button.textContent || '').includes('插入') && !(button.textContent || '').includes('插入行'))
+    insertGroup!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
+    const labels = ['向上插入行数量', '向下插入行数量', '向左插入列数量', '向右插入列数量']
+    const inputs = labels.map((label) => document.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement | null)
+    expect(inputs.every(Boolean), '四个插入项各有数量').toBe(true)
+    const input = inputs[1]!
+    expect(input.value).toBe('1')
+    expect(input.min).toBe('1')
+    input!.value = '0'
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+    input!.dispatchEvent(new Event('blur', { bubbles: true }))
+    await nextTick()
+    expect(input!.value).toBe('1')
+    input!.value = '3'
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    const rowsBefore = editor.getHTML().split('<tr').length - 1
+    const rowButton = [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === '向下插入行')
+    expect(rowButton, '向下插入行').toBeTruthy()
+    rowButton!.click()
+    await nextTick()
+    await flushPromises()
+    expect(editor.getHTML().split('<tr').length - 1).toBe(rowsBefore + 3)
+    let again = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (again < 0 && node.isText && node.text === '甲') again = pos
+    })
+    editor.commands.setTextSelection(again)
+    await clickTool(wrapper, '表格')
+    const insertAgain = [...document.querySelectorAll('.rte-table-menu button')].find((button) => (button.textContent || '').includes('插入') && !(button.textContent || '').includes('插入行'))
+    insertAgain!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
+    const inputAgain = document.querySelector('input[aria-label="向右插入列数量"]') as HTMLInputElement
+    inputAgain.value = '2'
+    inputAgain.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    const colButton = [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === '向右插入列')
+    expect(colButton, '向右插入列').toBeTruthy()
+    colButton!.click()
+    await nextTick()
+    await flushPromises()
+    const firstRow = editor.getHTML().match(/<tr[\s\S]*?<\/tr>/)?.[0] ?? ''
+    expect((firstRow.match(/<t[dh]/g) || []).length).toBe(3)
+    wrapper.unmount()
+  })
+
+  it('表格右键按插入、删除、单元格、表头、数据分组', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent('<table><tbody><tr><td><p>甲</p></td></tr></tbody></table>')
+    await nextTick()
+    const cell = wrapper.get('.ProseMirror td').element
+    cell.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 80, clientY: 80 }))
+    await nextTick()
+    const menu = document.querySelector('.rte-table-ctx')
+    expect(menu, '右键菜单').toBeTruthy()
+    const tops = [...menu!.querySelectorAll(':scope > .rte-table-ctx-group > button')].map((button) => (button.textContent || '').replace('▸', '').trim())
+    expect(tops).toEqual(['插入', '单元格', '表头', '数据', '阅读', '删除'])
+    expect(menu!.textContent).not.toContain('向上插入行')
+    const insert = [...menu!.querySelectorAll(':scope > .rte-table-ctx-group > button')].find((button) => (button.textContent || '').includes('插入'))
+    insert!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
+    expect(menu!.textContent).toContain('向上插入行')
+    expect(menu!.textContent).toContain('向右插入列')
+    expect(menu!.querySelector('input[aria-label="向下插入行数量"]')).toBeTruthy()
     wrapper.unmount()
   })
 
@@ -362,6 +453,51 @@ describe('新功能区按钮', () => {
     style.remove()
   })
 
+  it('表格阅读配色写到表格上，表头和偶数行换成所选颜色', async () => {
+    const css = readFileSync('src/components/rte/styles/editor.global.css', 'utf8')
+    const style = document.createElement('style')
+    style.textContent = css
+    document.head.appendChild(style)
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent(
+      '<table><tbody><tr><th><p>名</p></th></tr><tr><td><p>甲</p></td></tr><tr><td><p>乙</p></td></tr></tbody></table>',
+    )
+    let cell = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (cell < 0 && node.isText && node.text === '甲') cell = pos
+    })
+    editor.commands.setTextSelection(cell)
+    await openRibbon(wrapper, '表格')
+    await clickTool(wrapper, '表格')
+    const read = [...document.querySelectorAll('.rte-table-menu button')].find((button) => (button.textContent || '').replace('▸', '').trim() === '阅读')
+    expect(read, '阅读分组').toBeTruthy()
+    read!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
+    await clickMenu('护眼绿')
+    const table = wrapper.get('.ProseMirror table').element as HTMLTableElement
+    expect(table.getAttribute('data-read')).toBe('green')
+    expect(editor.getHTML()).toContain('data-read="green"')
+    const rows = [...table.querySelectorAll('tbody > tr')] as HTMLTableRowElement[]
+    expect(getComputedStyle(rows[0].cells[0]).backgroundColor.replace(/\s/g, '').toLowerCase()).toBe('#1f7a4d')
+    expect(getComputedStyle(rows[1].cells[0]).backgroundColor.replace(/\s/g, '').toLowerCase()).toBe('#e7f6ee')
+    expect(getComputedStyle(rows[2].cells[0]).backgroundColor.replace(/\s/g, '').toLowerCase()).not.toBe('#e7f6ee')
+    let again = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (again < 0 && node.isText && node.text === '甲') again = pos
+    })
+    editor.commands.setTextSelection(again)
+    await clickTool(wrapper, '表格')
+    const readAgain = [...document.querySelectorAll('.rte-table-menu button')].find((button) => (button.textContent || '').replace('▸', '').trim() === '阅读')
+    readAgain!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
+    await clickMenu('关闭阅读')
+    expect(table.getAttribute('data-read')).toBeNull()
+    expect(editor.getHTML()).not.toContain('data-read=')
+    wrapper.unmount()
+    style.remove()
+  })
+
   it('表格行列菜单可以按当前列降序', async () => {
     const wrapper = await mountEditor()
     const editor = editorOf(wrapper)
@@ -375,6 +511,11 @@ describe('新功能区按钮', () => {
     editor.commands.setTextSelection(cell)
     await openRibbon(wrapper, '表格')
     await clickTool(wrapper, '行列')
+    for (const label of ['向下插入行', '删除行', '合并单元格', '拆分单元格', '切换表头行', '按列降序']) {
+      const item = [...document.body.querySelectorAll('.rte-menu button')].find((button) => button.textContent === label)
+      expect(item, label).toBeTruthy()
+      expect(item!.querySelector('svg'), `${label}图标`).toBeTruthy()
+    }
     await clickMenu('按列降序')
     const text = editor.getText()
     expect(text.indexOf('乙')).toBeLessThan(text.indexOf('甲'))
@@ -385,19 +526,60 @@ describe('新功能区按钮', () => {
     localStorage.removeItem('rte-writing-paper:panel-a')
     const wrapper = await mountEditor()
     await openRibbon(wrapper, '书写')
-    await clickTool(wrapper, '纸样')
-    await clickMenu('小红书')
+    const paperChip = (label: string) =>
+      [...document.body.querySelectorAll('button.rte-paper-chip')].find((button) => button.textContent?.includes(label))
+    expect(paperChip('小红书')?.querySelector('.rte-paper-swatch')?.getAttribute('data-paper')).toBe('xhs')
+    expect(paperChip('默认')?.classList.contains('active')).toBe(true)
+    paperChip('小红书')!.click()
+    await nextTick()
     expect(wrapper.attributes('data-writing-paper')).toBe('xhs')
-    await clickTool(wrapper, '纸样')
-    await clickMenu('信纸')
+    expect(paperChip('小红书')?.classList.contains('active')).toBe(true)
+    paperChip('信纸')!.click()
+    await nextTick()
     expect(wrapper.attributes('data-writing-paper')).toBe('letter')
-    await clickTool(wrapper, '纸样')
-    await clickMenu('田字格')
+    paperChip('田字格')!.click()
+    await nextTick()
     expect(wrapper.attributes('data-writing-paper')).toBe('tianzi')
-    expect(localStorage.getItem('rte-writing-paper:panel-a')).toBe('tianzi')
-    await clickTool(wrapper, '纸样')
-    await clickMenu('默认')
+    for (const [label, id] of [['米字格', 'mizi'], ['四线三格', 'english'], ['点阵', 'dot'], ['康奈尔', 'cornell'], ['竖排', 'vertical'], ['坐标纸', 'graph']] as const) {
+      expect(paperChip(label)?.querySelector('.rte-paper-swatch')?.getAttribute('data-paper')).toBe(id)
+      paperChip(label)!.click()
+      await nextTick()
+      expect(wrapper.attributes('data-writing-paper')).toBe(id)
+    }
+    expect(localStorage.getItem('rte-writing-paper:panel-a')).toBe('graph')
+    paperChip('默认')!.click()
+    await nextTick()
     expect(wrapper.attributes('data-writing-paper')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('注音可以手填，也可以按汉字自动加拼音', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent('<p>银行</p>')
+    editor.commands.setTextSelection({ from: 1, to: 3 })
+    await openRibbon(wrapper, '字体与颜色')
+    await clickTool(wrapper, '注音')
+    const labels = [...document.body.querySelectorAll('button')].map((button) => button.textContent?.trim())
+    expect(labels).toContain('手动填写')
+    expect(labels).toContain('自动注音')
+    await clickMenu('自动注音')
+    const html = editor.getHTML()
+    expect(html).toContain('data-ruby="yín"')
+    expect(html).toContain('data-ruby="háng"')
+    editor.commands.setTextSelection({ from: 1, to: 3 })
+    await clickTool(wrapper, '注音')
+    await clickMenu('手动填写')
+    const prompt = document.querySelector('[aria-label="注音 / 拼音"]')
+    expect(prompt, '手动注音').toBeTruthy()
+    const cancel = [...prompt!.querySelectorAll('button')].find((button) => button.textContent?.trim() === '取消')
+    cancel!.click()
+    await nextTick()
+    editor.commands.setContent('<p>OK</p>')
+    editor.commands.setTextSelection({ from: 1, to: 3 })
+    await clickTool(wrapper, '注音')
+    await clickMenu('自动注音')
+    expect(editor.getHTML()).not.toContain('data-ruby')
     wrapper.unmount()
   })
 
@@ -435,6 +617,27 @@ describe('新功能区按钮', () => {
     await clickTool(wrapper, '边框')
     await clickMenu('细边')
     expect(editor.getHTML()).toContain('data-border')
+    wrapper.unmount()
+  })
+
+  it('除告示外，下拉子项都带图标', async () => {
+    const wrapper = await mountEditor()
+    await openRibbon(wrapper, '段落与列表')
+    await clickTool(wrapper, '列表')
+    for (const label of ['无序列表', '有序列表', '任务列表', '增加缩进']) {
+      const item = [...document.body.querySelectorAll('.rte-menu button')].find((button) => button.textContent === label)
+      expect(item, label).toBeTruthy()
+      expect(item!.querySelector('svg'), `${label}图标`).toBeTruthy()
+    }
+    await openRibbon(wrapper, '整理')
+    await clickTool(wrapper, '整理')
+    const half = [...document.body.querySelectorAll('.rte-menu button')].find((button) => button.textContent === '转为半角')
+    expect(half?.querySelector('svg'), '整理图标').toBeTruthy()
+    await openRibbon(wrapper, '块与结构')
+    await clickTool(wrapper, '告示')
+    const calloutButtons = [...document.body.querySelectorAll('.rte-callout-menu button')]
+    expect(calloutButtons.length).toBeGreaterThan(0)
+    expect(calloutButtons.every((button) => !button.querySelector('svg'))).toBe(true)
     wrapper.unmount()
   })
 })

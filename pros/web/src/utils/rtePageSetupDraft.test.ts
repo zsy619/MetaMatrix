@@ -22,6 +22,29 @@ describe('页面设置草稿', () => {
     expect(resolvePageSetupDraft(current, pageSetupDraftOf(current))).toBeNull()
   })
 
+  it('只改页眉时保留偶数页眉、偶数页脚和装订线', () => {
+    const current: PageSetupSnap = {
+      ...narrow,
+      chrome: {
+        header: '奇数',
+        headerEven: '偶数',
+        footer: '底',
+        footerEven: '偶底',
+        pageNumber: 'n',
+        gutter: 8,
+      },
+    }
+    const next = resolvePageSetupDraft(current, { ...pageSetupDraftOf(current), header: '新页眉' })
+    expect(next?.chrome).toEqual({
+      header: '新页眉',
+      headerEven: '偶数',
+      footer: '底',
+      footerEven: '偶底',
+      pageNumber: 'n',
+      gutter: 8,
+    })
+  })
+
   it('只改页眉时不动页面大小和边距', () => {
     const next = resolvePageSetupDraft(narrow, { ...pageSetupDraftOf(narrow), header: ' 验收页眉 ' })
     expect(next?.chrome.header).toBe('验收页眉')

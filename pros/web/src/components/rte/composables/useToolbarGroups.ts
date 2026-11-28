@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import {
   buildToolbarGroups,
   bumpToolbarUndoEpoch,
@@ -14,7 +14,7 @@ import {
   TOOLBAR_GROUPS,
   type ToolbarDropBox,
 } from '../../../utils/rteToolbarGroups'
-import { FOCUS_TOOLBAR_KEYS, readStoredRibbonTab, searchToolbarTools } from '../../../utils/rteToolbarOptimize'
+import { FOCUS_TOOLBAR_KEYS, hiddenGroupPlaceholders, orderToolbarSearchGroups, readStoredRibbonTab, toolsForToolbar } from '../../../utils/rteToolbarOptimize'
 import {
   isDefaultToolbarGroupConfig,
   moveGroupButton,
@@ -32,6 +32,32 @@ type GroupLineBox = {
   width: number
   height: number
   seam: 'both' | 'before' | 'after' | 'none'
+}
+
+/** 组内按钮显隐与顺序的本地镜像。文档页不走 Pinia 文档 store，只能落在这里。 */
+const GROUP_BUTTONS_STORE_KEY = 'metamatrix:rte-group-buttons'
+
+type LocalGroupButtonMap = Record<string, Record<string, Required<ToolbarGroupButtonConfig>>>
+
+function readLocalGroupButtonMap(): Record<string, ToolbarGroupButtonsByPanelId[string]> {
+  if (typeof localStorage === 'undefined') return {}
+  try {
+    const raw = localStorage.getItem(GROUP_BUTTONS_STORE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, ToolbarGroupButtonsByPanelId[string]>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeLocalGroupButtonMap(map: LocalGroupButtonMap) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(GROUP_BUTTONS_STORE_KEY, JSON.stringify(map))
+  } catch {
+    /* 隐私模式 */
+  }
 }
 
 /** 流式工具栏里分组本身不占盒子，按每一行按钮的外接矩形命中。 */
@@ -74,6 +100,12 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   setPanelToolbarOrder: (panelId: string, order: readonly string[]) => void
   /** 组内按钮显隐与顺序的持久化入口（按面板）。 */
   buttonConfigMap: () => ToolbarGroupButtonsByPanelId | undefined
+  /**
+   * 画布 JSON 是否由 Pinia 文档 store 持有。
+   * 知识库文档页自己加载文档、只存 html，store 里没有 currentData，
+   * 这时组内顺序必须走本地镜像，否则上移/下移看起来毫无反应。
+   */
+  hasStoreDoc?: () => boolean
   setPanelGroupButtons: (
     panelId: string,
     groupId: string,
@@ -111,9 +143,11 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   })
 
   const toolbarGroups = computed(() => {
-    const tools = deps.expanded()
-      ? deps.tools().filter((tool) => tool.kind !== 'divider')
-      : deps.tools().filter((tool) => tool.kind !== 'divider' && deps.primaryKeys.has(tool.key))
+    const tools = toolsForToolbar(deps.tools(), {
+      expanded: deps.expanded(),
+      querying: !!deps.toolbarQuery?.().trim(),
+      primary: deps.primaryKeys,
+    })
     return buildToolbarGroups(tools, toolbarOrder.value, toolbarGroupButtonConfigs.value)
   })
 
@@ -123,7 +157,13 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   ))
   /** 没有按钮的分组不占栏目。例如空的「其他」。 */
   const ribbonTabs = computed(() =>
-    RIBBON_TABS.filter((tab) => toolbarGroups.value.some((group) => tab.groups.includes(group.id))),
+    RIBBON_TABS.filter((tab) =>
+      tab.groups.some((id) => {
+        if (toolbarGroups.value.some((group) => group.id === id)) return true
+        const def = TOOLBAR_GROUPS.find((group) => group.id === id)
+        return !!def && def.keys.length > 0
+      }),
+    ),
   )
   function setRibbonTab(id: string) {
     const available = ribbonTabs.value.map((tab) => tab.id)
@@ -151,47 +191,100 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
         .filter((group) => group.tools.length)
     }
     const query = deps.toolbarQuery?.().trim() || ''
-    if (query) {
-      const hits = new Set(searchToolbarTools(toolbarGroups.value, query, 40).map((hit) => `${hit.groupId}:${hit.key}`))
-      return toolbarGroups.value
-        .map((group) => ({
-          ...group,
-          tools: group.tools.filter((tool) => hits.has(`${group.id}:${tool.key}`)),
-        }))
-        .filter((group) => group.tools.length)
-    }
+    if (query) return orderToolbarSearchGroups(toolbarGroups.value, query, 24).groups
     if (!deps.expanded()) return toolbarGroups.value
-    const allow = new Set(ribbonGroupsFor(ribbonTab.value))
-    const visible = toolbarGroups.value.filter((group) => allow.has(group.id))
-    if (visible.length) return visible
+    const allowIds = ribbonGroupsFor(ribbonTab.value)
+    const visible = toolbarGroups.value.filter((group) => allowIds.includes(group.id))
+    const defined = TOOLBAR_GROUPS.map((group) => ({ id: group.id, label: group.label, keyCount: group.keys.length }))
+    const withPlaceholders = hiddenGroupPlaceholders(visible, allowIds, defined)
+    if (withPlaceholders.length) return withPlaceholders
     const fallback = ribbonTabs.value[0]?.id
     if (fallback && fallback !== ribbonTab.value) ribbonTab.value = fallback
-    return toolbarGroups.value.filter((group) => ribbonGroupsFor(fallback || ribbonTab.value).includes(group.id))
+    const fallbackIds = ribbonGroupsFor(fallback || ribbonTab.value)
+    return hiddenGroupPlaceholders(
+      toolbarGroups.value.filter((group) => fallbackIds.includes(group.id)),
+      fallbackIds,
+      defined,
+    )
   })
+
+  /**
+   * 组内按钮配置的本地镜像（按面板 → 分组）。
+   * 画布页以 store 为准，文档页没有 store 文档，只能用这份镜像。
+   */
+  const localGroupButtons = ref<LocalGroupButtonMap>({})
+
+  function loadLocalGroupButtons(panelId: string) {
+    if (!panelId || localGroupButtons.value[panelId]) return
+    const raw = readLocalGroupButtonMap()
+    const panel = raw[panelId]
+    const out: Record<string, Required<ToolbarGroupButtonConfig>> = {}
+    for (const group of TOOLBAR_GROUPS) {
+      const cfg = panel?.[group.id]
+      if (!cfg) continue
+      out[group.id] = readToolbarGroupButtons(
+        { [panelId]: { [group.id]: cfg } } as ToolbarGroupButtonsByPanelId,
+        panelId,
+        group.id,
+        group.keys,
+      )
+    }
+    localGroupButtons.value = { ...localGroupButtons.value, [panelId]: out }
+  }
+
+  watch(
+    () => deps.panelId(),
+    (panelId) => {
+      if (panelId) loadLocalGroupButtons(panelId)
+    },
+    { immediate: true },
+  )
 
   /** 每个分组当前生效的组内按钮配置（已归一化）。旧分组 id 的配置先迁移到新分组。 */
   const toolbarGroupButtonConfigs = computed(() => {
     const map = migrateToolbarGroupButtons(deps.buttonConfigMap())
     const panelId = deps.panelId()
+    const hasStoreDoc = deps.hasStoreDoc ? deps.hasStoreDoc() : !!deps.buttonConfigMap()
+    const local = panelId ? localGroupButtons.value[panelId] : undefined
     const out: Record<string, Required<ToolbarGroupButtonConfig>> = {}
     for (const group of TOOLBAR_GROUPS) {
-      out[group.id] = readToolbarGroupButtons(map, panelId, group.id, group.keys)
+      const storeConfig = readToolbarGroupButtons(map, panelId, group.id, group.keys)
+      const localConfig = local?.[group.id]
+      out[group.id] = hasStoreDoc || !localConfig ? storeConfig : localConfig
     }
     return out
   })
 
-  /** 某个分组里可配置的全部按钮（含被隐藏的），用于配置面板。 */
+  /**
+   * 某个分组里可配置的全部按钮（含被隐藏的），用于配置面板。
+   * 列表按「当前生效顺序」返回：面板里看到的顺序 = 工具栏上的真实顺序，
+   * 上移/下移才会立刻有视觉反馈（此前按默认顺序返回，调整后看起来没反应）。
+   */
   function toolbarGroupButtonEntries(groupId: string) {
     const def = TOOLBAR_GROUPS.find((group) => group.id === groupId)
     if (!def) return []
     const config = toolbarGroupButtonConfigs.value[groupId]
     const labels = new Map(deps.tools().map((tool) => [tool.key, tool.label || tool.key]))
-    return def.keys.map((key, index) => ({
-      key,
-      label: labels.get(key) || key,
-      hidden: config.hidden.includes(key),
-      order: config.order.indexOf(key),
-      defaultIndex: index,
+    const order = config.order
+    const entries = def.keys
+      .map((key, defaultIndex) => ({
+        key,
+        label: labels.get(key) || key,
+        hidden: config.hidden.includes(key),
+        order: order.indexOf(key),
+        defaultIndex,
+      }))
+      .sort((a, b) => {
+        const ao = a.order < 0 ? Number.MAX_SAFE_INTEGER : a.order
+        const bo = b.order < 0 ? Number.MAX_SAFE_INTEGER : b.order
+        if (ao !== bo) return ao - bo
+        return a.defaultIndex - b.defaultIndex
+      })
+    return entries.map((entry, index) => ({
+      ...entry,
+      index,
+      canMoveUp: index > 0,
+      canMoveDown: index < entries.length - 1,
     }))
   }
 
@@ -210,6 +303,19 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     const panelId = deps.panelId()
     if (!panelId) return
     deps.setPanelGroupButtons(panelId, groupId, normalized)
+    // 本地镜像同步写一份：文档页没有画布 store，只靠 store 会「点了没反应」。
+    const panel = { ...(localGroupButtons.value[panelId] || {}) }
+    if (normalized) {
+      panel[groupId] = {
+        order: [...(normalized.order ?? [])],
+        hidden: [...(normalized.hidden ?? [])],
+      }
+    } else {
+      delete panel[groupId]
+    }
+    const nextLocal = { ...localGroupButtons.value, [panelId]: panel }
+    localGroupButtons.value = nextLocal
+    writeLocalGroupButtonMap(nextLocal)
   }
 
   /** 显示 / 隐藏某个组内按钮。 */
@@ -235,7 +341,24 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     const next = moveGroupButton(current, def.keys, key, to)
     if (!next) return
     persistGroupButtonConfig(groupId, next)
-    deps.announce(`${def.label}分组：按钮顺序已调整`)
+    const label = toolbarGroupButtonEntries(groupId).find((e) => e.key === key)?.label || key
+    deps.announce(`${def.label}分组：${label} 已${dir < 0 ? '上移' : '下移'}`)
+  }
+
+  /** 组内按钮置顶 / 置底（一次性挪到首尾）。 */
+  function moveToolbarGroupButtonToEdge(groupId: string, key: string, edge: 'top' | 'bottom') {
+    const def = TOOLBAR_GROUPS.find((group) => group.id === groupId)
+    if (!def) return
+    const current = toolbarGroupButtonConfigs.value[groupId]
+    const from = current.order.indexOf(key)
+    if (from < 0) return
+    const to = edge === 'top' ? 0 : current.order.length - 1
+    if (from === to) return
+    const next = moveGroupButton(current, def.keys, key, to)
+    if (!next) return
+    persistGroupButtonConfig(groupId, next)
+    const label = toolbarGroupButtonEntries(groupId).find((e) => e.key === key)?.label || key
+    deps.announce(`${def.label}分组：${label} 已${edge === 'top' ? '置顶' : '置底'}`)
   }
 
   function applyToolbarOrder(next: readonly string[], recordUndo: boolean) {
@@ -651,6 +774,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     toggleToolbarGroupButton,
     restoreToolbarGroupButtons,
     moveToolbarGroupButton,
+    moveToolbarGroupButtonToEdge,
     toolbarDropIndex,
     toolbarDragSource,
     undoToolbarGroupOrder,

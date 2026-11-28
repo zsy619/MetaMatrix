@@ -27,6 +27,14 @@ const browser = await chromium.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
 })
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+// 开场动画会铺满视口并让 app-root 进入 inert，先标记“下次不再展示”，
+// 否则登录按钮点不到，CI 里的浏览器用例会一直等下去。
+// 另外最大化工具栏一次只渲染一个功能区（ribbon）分组，图表按钮只在「图表」
+// 功能区里；这里提前把当前功能区设为 charts，否则工具栏里一个图表按钮都没有。
+await page.addInitScript(() => {
+  localStorage.setItem('metamatrix:launch-skip', '1')
+  localStorage.setItem('rte-ribbon-tab', 'charts')
+})
 const pageErrors = []
 /** 预览页没有 favicon，浏览器的自动请求会报 404，与本页无关；真正的 404 由 response 监听记录。 */
 const isIgnorable = (text) => /favicon/i.test(text) || /Failed to load resource/i.test(text)
@@ -67,18 +75,16 @@ await page.waitForTimeout(1200)
 
 /** 1. 工具栏「图表」分组：一级分类各自一个下拉按钮（9 个，3D·GL 独立）。 */
 const groupLabels = ['基础', '统计', '关系', '层级', '地理', '金融', '坐标系', '组件', '3D·GL']
+// 生产里按钮 title 带分组说明（如「插入基础图表：折线 / 柱状 / 饼图 / 散点」），
+// 所以用前缀匹配；精确匹配会永远数到 0 个。
 const groupButtons = page.locator(
-  '.rte-toolbar button[title="插入基础图表"], .rte-toolbar button[title="插入统计图表"], ' +
-    '.rte-toolbar button[title="插入关系图表"], .rte-toolbar button[title="插入层级图表"], ' +
-    '.rte-toolbar button[title="插入地理图表"], .rte-toolbar button[title="插入金融图表"], ' +
-    '.rte-toolbar button[title="插入坐标系图表"], .rte-toolbar button[title="插入组件图表"], ' +
-    '.rte-toolbar button[title="插入3D·GL图表"]',
+  groupLabels.map((label) => `.rte-toolbar button[title^="插入${label}图表"]`).join(', '),
 )
 const groupCount = await groupButtons.count()
 log('工具栏图表一级分类按钮', groupCount >= 9, `${groupCount} 个`)
 
 // 点「基础」下拉：只列基础分类下的图表类型
-const basicButton = page.locator('.rte-toolbar button[title="插入基础图表"]').first()
+const basicButton = page.locator('.rte-toolbar button[title^="插入基础图表"]').first()
 if (await basicButton.count()) {
   await basicButton.click()
   await page.waitForTimeout(400)
@@ -92,7 +98,7 @@ if (await basicButton.count()) {
 }
 
 // 3D / GL 独立下拉
-const glButton = page.locator('.rte-toolbar button[title="插入3D·GL图表"]').first()
+const glButton = page.locator('.rte-toolbar button[title^="插入3D·GL图表"]').first()
 if (await glButton.count()) {
   await glButton.click()
   await page.waitForTimeout(400)
@@ -107,17 +113,19 @@ if (await glButton.count()) {
 
 /** 2. 三类图表的属性面板。 */
 const panels = [
-  { index: 0, name: 'bar', title: '03-panel-bar.png' },
-  { index: 1, name: 'pie', title: '04-panel-pie.png' },
-  { index: 2, name: 'graph', title: '05-panel-graph.png' },
+  { index: 0, name: 'bar', schemaLabel: '柱状图', title: '03-panel-bar.png' },
+  { index: 1, name: 'pie', schemaLabel: '饼图', title: '04-panel-pie.png' },
+  { index: 2, name: 'graph', schemaLabel: '关系图', title: '05-panel-graph.png' },
 ]
 for (const item of panels) {
   const ok = await page.evaluate((index) => window.__selectChart(index), item.index)
   await page.waitForTimeout(500)
   const panel = page.locator('.rte-chart-panel')
   const visible = await panel.count()
-  const type = visible ? (await panel.locator('.rte-cp-type').textContent()) || '' : ''
-  log(`属性面板（${item.name}）`, ok && visible > 0 && type.includes(item.name), type)
+  // 面板头部已改为 .rte-cp-subtitle，内容是 schema 的中文名（柱状图 / 饼图 / 关系图）；
+  // 旧的 .rte-cp-type 已经不存在。
+  const type = visible ? (await panel.locator('.rte-cp-subtitle').textContent()) || '' : ''
+  log(`属性面板（${item.name}）`, ok && visible > 0 && type.includes(item.schemaLabel), type)
   await page.screenshot({ path: `${out}/${item.title}` })
 }
 
@@ -238,7 +246,9 @@ const noBlockBar = await page.evaluate(() => {
 log('块内无操作条', noBlockBar.ok, JSON.stringify(noBlockBar))
 
 /** 4.7 属性面板有「图表类型」下拉，且改类型会写回文档。 */
-const typeSelect = page.locator('.rte-chart-panel .rte-cp-type-select').first()
+// 面板头部有多个 .rte-cp-type-select（引用表格 / 图注 / 单位 / 来源 / 图表类型），
+// 只有「图表类型」那个带 title="换成另一种图"，必须按它定位，不能取第一个。
+const typeSelect = page.locator('.rte-chart-panel select[title="换成另一种图"]').first()
 if (await typeSelect.count()) {
   await typeSelect.selectOption('pie')
   await page.waitForTimeout(600)
@@ -309,7 +319,18 @@ const inspectConfirm = () =>
  * 确认弹窗必须仍然盖在它上面（修复前会被整层编辑器盖住，看不见）。
  */
 const beforeDelete = await countCharts()
-const immersiveBtn = page.locator('.rte-toolbar button[title="全屏沉浸编辑（Esc 退出）"]').first()
+// 最大化工具栏一次只渲染当前功能区（ribbon）；「全屏」按钮在「视图」组里，
+// 先切到「视图」，否则这个按钮根本不在 DOM 里。
+const viewTab = page.locator('.rte-toolbar .rte-ribbon-tab[data-ribbon-tab="view"]').first()
+if (await viewTab.count()) {
+  // 属性面板是浮层，正好盖在功能区上，普通 click 会被面板拦截；
+  // 直接对 tab 派发 click，走元素自身事件，不依赖命中测试。
+  await viewTab.evaluate((el) => (el instanceof HTMLElement ? el.click() : undefined))
+  await page.waitForTimeout(400)
+}
+// 按钮 title 现在会根据状态变化（「全屏编辑，按 Esc 退出」/「已是全屏…」），
+// 用标题前缀定位（普通工具按钮没有 data-rte-anchor）。
+const immersiveBtn = page.locator('.rte-toolbar button[title^="全屏"]').first()
 if (await immersiveBtn.count()) {
   await immersiveBtn.click()
   await page.waitForTimeout(700)

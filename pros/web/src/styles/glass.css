@@ -1,0 +1,662 @@
+/*
+ * 玻璃拟态设计层（ui-ux-pro-max · Glassmorphism）。
+ *
+ * 关键效果：背景模糊（backdrop-filter 10-20px）、1px 半透明白描边、
+ * 顶部高光反射、轻投影分层。
+ *
+ * 约束：
+ *   1) 文字对比度不低于 4.5:1 —— 玻璃底上仍是深色文字，只改表面质感；
+ *   2) 键盘焦点圈保留，玻璃不能吃掉 focus-visible；
+ *   3) prefers-reduced-motion 下取消位移与过渡；
+ *   4) 只做表面与交互反馈的统一，不改信息结构与交互行为。
+ */
+
+:root {
+  /* 玻璃材质参数 */
+  --glass-blur: 18px;
+  --glass-blur-sm: 10px;
+  --glass-saturate: 165%;
+  --glass-bg: rgba(255, 255, 255, 0.24);
+  --glass-bg-strong: rgba(255, 255, 255, 0.5);
+  --glass-bg-soft: rgba(255, 255, 255, 0.26);
+  --glass-bg-hover: rgba(255, 255, 255, 0.34);
+  /* 描边：外白内灰，形成玻璃厚度 */
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-ring: rgba(15, 23, 42, 0.09);
+  --glass-shadow: 0 18px 48px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --glass-shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.1), 0 1px 3px rgba(15, 23, 42, 0.05);
+  /* 顶部反光 */
+  --glass-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.78) 0%,
+    rgba(255, 255, 255, 0.24) 38%,
+    rgba(255, 255, 255, 0) 58%
+  );
+  /* 页面极光背景：给 backdrop-filter 提供可折射的内容 */
+  --glass-aurora:
+    radial-gradient(1100px 680px at 14% 6%, rgba(37, 99, 235, 0.85), transparent 66%),
+    radial-gradient(980px 600px at 84% 10%, rgba(147, 51, 234, 0.72), transparent 64%),
+    radial-gradient(980px 620px at 26% 88%, rgba(13, 148, 136, 0.62), transparent 64%),
+    radial-gradient(900px 560px at 78% 84%, rgba(2, 132, 199, 0.6), transparent 66%),
+    radial-gradient(760px 520px at 48% 44%, rgba(219, 39, 119, 0.34), transparent 70%),
+    radial-gradient(680px 460px at 66% 30%, rgba(124, 58, 237, 0.38), transparent 72%);
+}
+
+/* ---------------- 背景 ---------------- */
+
+/*
+ * 背景分层：html 承担底色，body 保持透明。
+ * 若 body 自身不透明，body::before（z-index:-1）会被 body 背景盖住，
+ * 极光层就采样不到，玻璃会退化成纯白半透明。
+ */
+html {
+  background-color: #cdd9f0;
+}
+
+body {
+  background: transparent;
+}
+
+/* #app 必须透明，否则会盖住 body::before 的极光层，玻璃就采不到颜色 */
+#app {
+  background: transparent;
+}
+
+/*
+ * 极光背景单独做一层固定定位的伪元素：
+ * backdrop-filter 只对「独立层」采样，body 上的固定背景在 Chrome 里取不到，
+ * 玻璃就变成了纯白半透明。
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: #cdd9f0;
+  background-image: var(--glass-aurora);
+}
+
+/* 玻璃面板通用类：给自绘浮层复用同一套材质 */
+.glass-surface,
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-sm);
+}
+
+/* ---------------- Element Plus：遮罩与弹窗 ---------------- */
+
+:root {
+  --mm-dlg-backdrop: rgba(15, 23, 42, 0.34);
+}
+
+.el-overlay,
+.pm-overlay,
+body .overlay,
+body .rev-overlay,
+body .ap-overlay,
+body .bfp-modal-overlay {
+  background: var(--mm-dlg-backdrop);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+
+/*
+ * 登录 / 注册的提交遮罩（.auth-overlay）刻意不走玻璃模糊：
+ * 它的职责只是"吃掉指针事件 + 显示进度"，而登录卡片按钮里有一条
+ * 正在推进的品牌进度条，10px 模糊会把卡片连同进度条一起糊掉，
+ * 用户就看不到自己点下去的反馈。该遮罩的样式由
+ * components/ui/AuthSubmitOverlay.vue 自行管理。
+ */
+
+.el-dialog {
+  /* 弹窗要压住背后内容，用强玻璃而不是弱玻璃，否则正文透出背景文字看不清 */
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* 顶部反光：玻璃厚度的主要视觉线索 */
+.el-dialog::before,
+.el-message-box::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 42%;
+  background: var(--glass-sheen);
+  pointer-events: none;
+}
+
+.el-dialog__header {
+  background: transparent;
+  border-bottom: 1px solid var(--glass-ring);
+  position: relative;
+}
+
+.el-dialog__footer {
+  /* 旧规则是不透明白条，和玻璃外壳拼在一起像贴了块纸；改成同材质的浅玻璃 */
+  background: transparent;
+  border-top: 1px solid var(--glass-ring);
+  position: relative;
+}
+
+.el-dialog__body {
+  position: relative;
+}
+
+.el-dialog__headerbtn:hover {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  border-radius: var(--ent-radius-sm, 8px);
+}
+
+.el-message-box {
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--mm-dlg-radius, 18px);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+}
+
+/* ---------------- Element Plus：浮层（下拉、气泡、选择器） ---------------- */
+
+.el-popover.el-popper,
+.el-dropdown__popper,
+.el-select__popper,
+.el-picker__popper,
+.el-autocomplete__popper,
+.el-cascader__dropdown {
+  background: var(--glass-bg-strong) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.el-popover.el-popper .el-popper__arrow,
+.el-dropdown__popper .el-popper__arrow,
+.el-select__popper .el-popper__arrow {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-border);
+}
+
+.el-dropdown-menu__item:not(.is-disabled):hover,
+.el-select-dropdown__item.is-hovering,
+.el-popper li:hover {
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--ent-primary-strong, #1758b8);
+}
+
+/* ---------------- Element Plus：输入类 ---------------- */
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+  box-shadow: 0 0 0 1px var(--glass-ring) inset, 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.el-input__wrapper:hover,
+.el-select__wrapper:hover {
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.14) inset;
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused {
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 0 0 1px var(--ent-primary, #1a73e8) inset, 0 0 0 3px rgba(26, 115, 232, 0.16);
+}
+
+/* ---------------- Element Plus：按钮与工具栏悬停 ---------------- */
+
+/*
+ * 工具栏按钮悬停统一为「玻璃片 + 高光」：
+ * 描边提亮、底色加透、投影加深，避免各页面各写一套。
+ */
+/* 语义色按钮（primary/danger/success/warning/info）保留自己的底色，否则白字会落到白玻璃上不可见 */
+.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info) {
+  background: rgba(255, 255, 255, 0.58);
+  border-color: var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+}
+
+.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info):hover {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--glass-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.el-button.is-text:not(.is-link),
+.el-button.is-link {
+  border-radius: var(--ent-radius-sm, 8px);
+}
+
+.el-button.is-text:not(.is-link):hover {
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+  color: var(--ent-primary-strong, #1758b8);
+}
+
+.el-button--primary:not(.is-text):not(.is-link) {
+  background: linear-gradient(180deg, #3b82f6 0%, var(--ent-primary, #1a73e8) 100%);
+  border-color: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 6px 18px rgba(26, 115, 232, 0.32);
+}
+
+.el-button--primary:not(.is-text):not(.is-link):hover {
+  background: linear-gradient(180deg, var(--ent-primary, #1a73e8) 0%, var(--ent-primary-strong, #1758b8) 100%);
+  box-shadow: 0 10px 26px rgba(26, 115, 232, 0.38);
+  transform: translateY(-1px);
+}
+
+/* 危险操作按钮用加深的红（EP 默认 #f56c6c 白字对比度不足），悬停与主按钮同一套抬升手感 */
+.el-button--danger:not(.is-text):not(.is-link) {
+  background: linear-gradient(180deg, #d93025 0%, #b7251c 100%);
+  border-color: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 2px 8px rgba(217, 48, 37, 0.2);
+}
+
+.el-button--danger:not(.is-text):not(.is-link):hover {
+  background: linear-gradient(180deg, #c62a20 0%, #a92219 100%);
+  box-shadow: 0 6px 16px rgba(217, 48, 37, 0.26);
+  transform: translateY(-1px);
+}
+
+.el-button:focus-visible,
+.el-input__wrapper:focus-within,
+.el-select__wrapper:focus-within {
+  outline: 2px solid var(--ent-primary, #1a73e8);
+  outline-offset: 2px;
+}
+
+/* ---------------- Element Plus：表格 ---------------- */
+
+.el-table {
+  --el-table-border-color: var(--glass-ring);
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.62);
+  --el-table-tr-bg-color: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.62);
+  background: transparent;
+  border-radius: var(--ent-radius-md, 12px);
+  overflow: hidden;
+}
+
+.el-table th.el-table__cell {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+  color: var(--ent-text-2, #5a6472);
+  font-weight: 600;
+  border-bottom-color: var(--glass-ring);
+}
+
+.el-table td.el-table__cell {
+  background: transparent;
+}
+
+.el-table tr:hover > td.el-table__cell {
+  background: rgba(255, 255, 255, 0.58) !important;
+}
+
+.el-table__inner-wrapper::before {
+  background-color: var(--glass-ring);
+}
+
+/* Element Plus 默认白底组件：改为透明，露出背后的极光 */
+.el-tree {
+  --el-tree-bg-color: transparent;
+  --el-tree-node-hover-bg-color: var(--glass-bg-hover);
+  background: transparent;
+}
+
+.el-card {
+  --el-card-bg-color: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow-sm);
+}
+
+.el-descriptions,
+.el-collapse,
+.el-collapse-item__header,
+.el-collapse-item__wrap {
+  background: transparent;
+}
+
+.el-collapse-item__header.is-active,
+.el-collapse-item__wrap.is-active {
+  background: var(--glass-bg-soft);
+}
+
+.el-tabs__header {
+  background: transparent;
+}
+
+.el-empty__description p {
+  color: var(--ent-text-2, #5a6472);
+}
+
+/* ---------------- 富文本编辑器：功能区工具栏 ---------------- */
+
+/* 正文纸面保持不透明白（可读性），只把功能区做成玻璃 */
+.rte-ribbon-bar,
+.rte-root.expanded .rte-toolbar,
+.rte-toolbar {
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
+}
+
+.rte-ribbon-bar {
+  border-bottom-color: var(--glass-ring);
+}
+
+/* 表格外框：卡片化玻璃容器 */
+.el-table__wrapper,
+.el-table {
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-sm);
+}
+
+/* ---------------- 业务卡片与列表 ---------------- */
+
+.ent-card,
+.ent-stat {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-sm);
+}
+
+.ent-card__head {
+  background: var(--glass-sheen);
+  border-bottom-color: var(--glass-ring);
+}
+
+.ent-stat:hover {
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--glass-shadow);
+}
+
+.ent-list__row:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------------- 工具栏与行内按钮：统一悬停反馈 ---------------- */
+
+/*
+ * 各组件自带的不透明悬停底色（--mm-hover / --ent-surface-2）在玻璃面板上会显脏，
+ * 这里统一换成半透明白片；important 是为了压过组件 scoped 样式里同名的旧规则。
+ */
+.kn-tree__hit:hover,
+.kn-tree__node-icon:hover,
+.kn-quick__template:hover,
+.kn-board__card:hover,
+.doc-backrefs__item:hover,
+.doc-comments__candidate:hover,
+.doc-history__item:hover,
+.doc-view__related-item:hover,
+.doc-view__icon:hover,
+.doc-outline__item:hover,
+.mm__row:hover,
+.mm__toggle:hover,
+.mm__ops button:hover,
+.sheet__chip:hover,
+.sheet-grid__head-more:hover,
+.sheet-grid__add-btn:hover,
+.sheet-grid__ops-btn:hover,
+.kn-canvas-panel__icon:hover {
+  background: rgba(255, 255, 255, 0.66) !important;
+  box-shadow: var(--glass-shadow-sm);
+}
+
+.sheet-grid__row:hover {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* 悬停时轻微上浮，和按钮的悬停反馈保持同一套节奏 */
+.kn-board__card:hover,
+.kn-quick__template:hover {
+  transform: translateY(-1px);
+}
+
+/* ---------------- 统一工具条：画布 / 表格 / 文档 / 节点画布 四处复用 ---------------- */
+/* 参照画布工具条：白玻璃动作组 + 胶囊状态 + 蓝色主按钮。改这一处，四处同时生效 */
+
+.mm-bar__group {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 3px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.46);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+}
+.mm-bar__cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.mm-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ent-text-2, #5a6472);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease,
+    color 0.16s ease;
+}
+.mm-bar__btn:hover {
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
+  color: var(--mm-text, #1d2129);
+}
+.mm-bar__btn--square {
+  width: 26px;
+  padding: 0;
+  justify-content: center;
+}
+.mm-bar__value {
+  width: 40px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ent-text-2, #5a6472);
+  font-variant-numeric: tabular-nums;
+}
+.mm-bar__divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: var(--glass-ring, rgba(15, 23, 42, 0.09));
+}
+
+/* 开关态按钮（抓手 / 编号 / 背景等按下状态），所有画布工具条一致 */
+.mm-bar__btn.is-on {
+  background: rgba(47, 140, 255, 0.14);
+  color: var(--mm-blue, #1677ff);
+}
+
+.mm-bar__btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+/* 画布工具条里的原生下拉（配色、刻度等） */
+.mm-bar__select {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--mm-text, #1d2129);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* EP 按钮的底色/边框由 CSS 变量驱动，全局规则特异性更高，只能用 !important 压成透明 */
+.el-button.mm-bar__btn {
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--ent-text-2, #5a6472);
+  background: transparent !important;
+  border-color: transparent !important;
+}
+.el-button.mm-bar__btn:hover {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: transparent !important;
+  color: var(--mm-text, #1d2129);
+}
+.el-button.mm-bar__btn .el-icon {
+  font-size: 14px;
+  margin-right: 0;
+}
+
+/* 状态胶囊：未保存 / 保存中 / 已保存 */
+.mm-bar__status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  max-width: 280px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  color: var(--mm-muted, #86909c);
+  white-space: nowrap;
+}
+/* 胶囊里的长文案（如保存失败原因）超出时省略号收尾，不撑破工具条 */
+.mm-bar__status > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mm-bar__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a9b0bb;
+}
+.mm-bar__status.is-saved {
+  color: var(--el-color-success);
+}
+.mm-bar__status.is-saved .mm-bar__status-dot {
+  background: var(--el-color-success);
+  box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.14);
+}
+.mm-bar__status.is-dirty {
+  color: #d46b08;
+}
+.mm-bar__status.is-dirty .mm-bar__status-dot {
+  background: #fa8c16;
+  box-shadow: 0 0 0 3px rgba(250, 140, 22, 0.14);
+}
+.mm-bar__status.is-saving .mm-bar__status-dot {
+  background: var(--el-color-primary);
+  animation: mm-bar-pulse 1s ease-in-out infinite;
+}
+.mm-bar__status.is-error {
+  color: #d93025;
+  background: rgba(252, 232, 230, 0.72);
+  border-color: rgba(217, 48, 37, 0.24);
+}
+.mm-bar__status.is-error .mm-bar__status-dot {
+  background: #d93025;
+  box-shadow: 0 0 0 3px rgba(217, 48, 37, 0.12);
+}
+
+/* 主按钮 */
+.mm-bar__primary {
+  height: 34px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2f8cff, #1264e8);
+  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.28);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+.mm-bar__primary:hover {
+  background: linear-gradient(135deg, #3d97ff, #1a6df0);
+  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.34);
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+}
+.el-button.mm-bar__primary {
+  padding: 0 15px;
+  font-size: 13px;
+  color: #fff !important;
+  background: linear-gradient(135deg, #2f8cff, #1264e8) !important;
+  border-color: transparent !important;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.28);
+}
+.el-button.mm-bar__primary:hover {
+  background: linear-gradient(135deg, #3d97ff, #1a6df0) !important;
+  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.34);
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+}
+
+@keyframes mm-bar-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------------- 无障碍与降级 ---------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .el-button:hover,
+  .ent-stat:hover {
+    transform: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .el-dialog,
+  .el-message-box,
+  .el-popover.el-popper,
+  .el-dropdown__popper,
+  .el-select__popper,
+  .ent-card,
+  .ent-stat {
+    background: #ffffff;
+  }
+}

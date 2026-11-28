@@ -14,7 +14,30 @@ import {
   parseCellAddress,
   parseCellNumber,
   recalculateTable,
+  remapFormulaByAxis,
 } from './rteTableFormula'
+
+describe('表格结构变化后的公式', () => {
+  const sameCol = (col: number) => col
+  it('删掉的行写成 #REF!，区域会收掉这一行', () => {
+    const mapRow = (row: number) => (row === 2 ? null : row > 2 ? row - 1 : row)
+    expect(remapFormulaByAxis('=A2', mapRow, sameCol)).toBe('=#REF!')
+    expect(remapFormulaByAxis('=SUM(A1:A3)', mapRow, sameCol)).toBe('=SUM(A1:A2)')
+    expect(evaluateFormula('=#REF!', [['1']], 0, 0).error).toBe('#REF!')
+    expect(evaluateFormula('=A1+#REF!', [['4']], 0, 1).error).toBe('#REF!')
+  })
+
+  it('中间插入一行时，求和区域把新行包进来', () => {
+    const mapRow = (row: number) => (row >= 2 ? row + 1 : row)
+    expect(remapFormulaByAxis('=SUM(A1:A3)', mapRow, sameCol)).toBe('=SUM(A1:A4)')
+  })
+
+  it('绝对引用跟着格子走，美元符号留着', () => {
+    const mapRow = (row: number) => row + 1
+    expect(remapFormulaByAxis('=$A$1', mapRow, sameCol)).toBe('=$A$2')
+    expect(remapFormulaByAxis('=SUM($A$1:$A$3)', mapRow, sameCol)).toBe('=SUM($A$2:$A$4)')
+  })
+})
 
 describe('排序后的公式行号', () => {
   it('行号按新位置改写', () => {
@@ -110,7 +133,7 @@ describe('错误码', () => {
   })
 
   it('未知函数返回 #NAME?', () => {
-    expect(evaluateFormula('=ROUND(A1)', grid, 0, 0).error).toBe('#NAME?')
+    expect(evaluateFormula('=MODE(A1)', grid, 0, 0).error).toBe('#NAME?')
     expect(evaluateFormula('=NOPE(', grid, 0, 0).error).toBe('#NAME?')
   })
 

@@ -40,6 +40,12 @@ importers:
       '@tiptap/extension-code-block-lowlight':
         specifier: 3.32.0
         version: 3.32.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/extension-code-block@3.32.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(highlight.js@11.12.0)(lowlight@3.3.0)
+      '@tiptap/extension-collaboration':
+        specifier: ^3.32.0
+        version: 3.35.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(@tiptap/y-tiptap@3.3.1(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(yjs@13.6.33)
+      '@tiptap/extension-collaboration-caret':
+        specifier: ^3.32.0
+        version: 3.35.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(@tiptap/y-tiptap@3.3.1(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))
       '@tiptap/extension-color':
         specifier: ^3.32.0
         version: 3.32.0(@tiptap/extension-text-style@3.32.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0)))
@@ -154,7 +160,22 @@ importers:
       vue-router:
         specifier: ^5.4.0
         version: 5.4.0(@vue/compiler-sfc@3.5.44)(esbuild@0.28.2)(pinia@4.1.0(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3)))(rolldown@1.2.15)(rollup@4.67.4)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2))(vue@3.5.44(typescript@6.0.3))
+      vxe-pc-ui:
+        specifier: ^4.21.7
+        version: 4.21.7(vue@3.5.44(typescript@6.0.3))
+      vxe-table:
+        specifier: ^4.24.5
+        version: 4.24.5
+      y-protocols:
+        specifier: ^1.0.7
+        version: 1.0.7(yjs@13.6.33)
+      yjs:
+        specifier: ^13.6.33
+        version: 13.6.33
     devDependencies:
+      '@tiptap/y-tiptap':
+        specifier: 3.3.1
+        version: 3.3.1(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
       '@types/jszip':
         specifier: ^3.4.0
         version: 3.4.1
@@ -867,6 +888,21 @@ packages:
     peerDependencies:
       '@tiptap/core': 3.32.0
 
+  '@tiptap/extension-collaboration-caret@3.35.0':
+    resolution: {integrity: sha512-In6IIx3PkK5R8P/6L7g4IajfFlronpIQjh+gVsyvFIURw6PhmGqOeYn33Aw73zi8AEctgvq2ZINdo9sfZedUSA==}
+    peerDependencies:
+      '@tiptap/core': 3.35.0
+      '@tiptap/pm': 3.35.0
+      '@tiptap/y-tiptap': ^3.0.7
+
+  '@tiptap/extension-collaboration@3.35.0':
+    resolution: {integrity: sha512-fG9IRDd1fcS5xS7kPRIyG/kswvRbNUd+NHvWaXygV/30oeUidGF1EC7oQ4M3lP1JYmJTB9LRBEA6rzWsKE2dXA==}
+    peerDependencies:
+      '@tiptap/core': 3.35.0
+      '@tiptap/pm': 3.35.0
+      '@tiptap/y-tiptap': ^3.0.7
+      yjs: ^13
+
   '@tiptap/extension-color@3.32.0':
     resolution: {integrity: sha512-whRpuiEZ94FXBbFryWAYJ9rOQrLe4CVQ7GAjWDh+fpm5MJfjtshFvMXtGFIlcmo3e1XBzCcAetmk0zMKoIU0RA==}
     peerDependencies:
@@ -1053,6 +1089,15 @@ packages:
       '@tiptap/core': 3.32.0
       '@tiptap/pm': 3.32.0
       vue: ^3.0.0
+
+  '@tiptap/y-tiptap@3.3.1':
+    resolution: {integrity: sha512-QbjDWZUWwgu22HyohKVVVZJnhkqGru+iibQR1yvN4+YnwEeTbRouCDGXOT93QqxpoEek+I9JM14zDkh9nq1/Aw==}
+    peerDependencies:
+      prosemirror-model: 1.25.12
+      prosemirror-state: 1.4.4
+      prosemirror-view: 1.42.7
+      y-protocols: ^1.0.1
+      yjs: ^13.6.13
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -1341,6 +1386,11 @@ packages:
     peerDependencies:
       vue: ^3.5.0
 
+  '@vxe-ui/core@4.5.10':
+    resolution: {integrity: sha512-X2Svp9DguuILvgPSthOenbvlGd/M7udV4q+Q8MIoYM17wkdd/ZBfdBLx5sVwODniN9JivlwSPUwp/dIatRuW9A==}
+    peerDependencies:
+      vue: ^3.2.0
+
   abbrev@5.0.0:
     resolution: {integrity: sha512-/XrFJgzQQQHpti1raDJC6m4ws6aNktmjBlhk8Fdlk7LwCEuDoieEJJY9OFHjfiFJFFRM2tK+Ky/IsfbbmlMu1w==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
@@ -1486,8 +1536,8 @@ packages:
     resolution: {integrity: sha512-X7sjQzceUhu1u7Y/ylrRZFU2FS6LRiFVp6rKLPg23y3x3c3DOKAwuXGDp+PAGjh6CSnCjYeAul8pcT8bAl+lSA==}
     engines: {node: ^10 || ^12.20.0 || ^14.13.0 || >=15.0.0}
 
-  csstype@3.2.3:
-    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+  csstype@3.2.4:
+    resolution: {integrity: sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ==}
 
   cytoscape-cose-bilkent@4.1.0:
     resolution: {integrity: sha512-wgQlVIUJF13Quxiv5e1gstZ08rnZj2XaLHGoFMYXz7SkNfCDOOteKBE6SYRfA9WxxI/iBc3ajfDoc6hb/MRAHQ==}
@@ -1689,6 +1739,9 @@ packages:
   dijkstrajs@1.0.3:
     resolution: {integrity: sha512-qiSlmBq9+BCdCA/L46dw8Uy93mloxsPSbwnm5yrKn2vMPiy8KyAskTF6zuV/j5BMsmOGZDPs7KjU+mjb670kfA==}
 
+  dom-zindex@1.0.8:
+    resolution: {integrity: sha512-n6UB0BU5pltbvMWNu3zZqnLO35uFvOjTBO/s2GiPbdnfhyVGYLhLxynou/B2QSQEPJR4d398/0jbUZHLNiOmfA==}
+
   dompurify@3.4.17:
     resolution: {integrity: sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==}
 
@@ -1847,6 +1900,9 @@ packages:
   isarray@1.0.0:
     resolution: {integrity: sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==}
 
+  isomorphic.js@0.2.5:
+    resolution: {integrity: sha512-PIeMbHqMt4DnUP3MA/Flc0HElYjMXArsw1qwJZcm9sqR8mq3l8NYizFMty0pWwE/tzIGH3EKK5+jes5mAr85yw==}
+
   js-beautify@2.0.3:
     resolution: {integrity: sha512-cyFbh3tkPhknnTD/0bLf0T0yy2ZIbqL05mttzbt4y1Zfr7NxqXQZ62dkBLKs3oHH/lpjmDRAnciJiSUyOy8XwQ==}
     engines: {node: '>=14'}
@@ -1892,6 +1948,11 @@ packages:
 
   layout-base@2.0.1:
     resolution: {integrity: sha512-dp3s92+uNI1hWIpPGH3jK2kxE2lMjdXdr+DH8ynZHpd6PUlH6x6cbuXnoMmiNumznqaNO31xu9e79F0uuZ0JFg==}
+
+  lib0@0.2.120:
+    resolution: {integrity: sha512-/a2eRImR8sZbmMVKe2we1/KukDQkuPyPf8yol6epvCu2PH6hurjcRI3mdGFFAi0uGoRJGyns99JquZgxwW1tQg==}
+    engines: {node: '>=16'}
+    hasBin: true
 
   lie@3.3.0:
     resolution: {integrity: sha512-UaiMJzeWRlEujzAuw5LokY1L5ecNQYZKfmyZ9L7wDHb/p5etKaxXhohBcrw0EYby+G/NA52vRSN4N39dxHAIwQ==}
@@ -2658,6 +2719,12 @@ packages:
       typescript:
         optional: true
 
+  vxe-pc-ui@4.21.7:
+    resolution: {integrity: sha512-7H2lYurYTmCdrnxcEyv3HXEk5+CiZbdOpJFiWAeV445n8eweWXbwZgbjl98onjPwnOfYjZDqyINkLLv0GiNzwQ==}
+
+  vxe-table@4.24.5:
+    resolution: {integrity: sha512-4/jXlACGxFn6nfp0JzhN4TeW2YzWIW1j4lXYN7X7ERZES7ykmwMm+YQ0jhJE3DGkpenJELCvWmJUmlPCRjdxXg==}
+
   w3c-keyname@2.2.8:
     resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
 
@@ -2708,12 +2775,21 @@ packages:
       utf-8-validate:
         optional: true
 
+  xe-utils@4.3.0:
+    resolution: {integrity: sha512-VVRvaX7+dByUMUuKDmexjTPvWckoBSk4DzcXEb3PL5i3YmYCA2UUW5VGwJVuox7SNe3nGT2vHaM6zw4uvOUBYA==}
+
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
     engines: {node: '>=18'}
 
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
+
+  y-protocols@1.0.7:
+    resolution: {integrity: sha512-YSVsLoXxO67J6eE/nV4AtFtT3QEotZf5sK5BHxFBXso7VDUT3Tx07IfA6hsu5Q5OmBdMkQVmFZ9QOA7fikWvnw==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
+    peerDependencies:
+      yjs: ^13.0.0
 
   y18n@4.0.3:
     resolution: {integrity: sha512-JKhqTOwSrqNA1NY5lSztJ1GrBiUodLMmIZuLiDaMRJ+itFd+ABVE8XBjOvIWL+rSqNDC74LCSFmlb/U4UZ4hJQ==}
@@ -2725,6 +2801,10 @@ packages:
   yargs@15.3.1:
     resolution: {integrity: sha512-92O1HWEjw27sBfgmXiixJWT5hRBp2eobqXicLtPBIDBhYB+1HpwZlXmbW2luivBJHBzki+7VyCLRtAkScbTBQA==}
     engines: {node: '>=8'}
+
+  yjs@13.6.33:
+    resolution: {integrity: sha512-q/UYvr1gOk4XII+Cu1CW2dINjYqJJFifTzogEaIARznrvX7uOlHsdTEXcnOBMuIsrCGEEKdNxi74kyMLZlKVfw==}
+    engines: {node: '>=16.0.0', npm: '>=8.0.0'}
 
   zrender@5.6.1:
     resolution: {integrity: sha512-OFXkDJKcrlx5su2XbzJvj/34Q3m6PvyCZkVPHGYpcCJ52ek4U/ymZyfuV1nKE23AyBJ51E/6Yr0mhZ7xGTO4ag==}
@@ -3215,6 +3295,19 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.32.0(@tiptap/pm@3.32.0)
 
+  '@tiptap/extension-collaboration-caret@3.35.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(@tiptap/y-tiptap@3.3.1(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))':
+    dependencies:
+      '@tiptap/core': 3.32.0(@tiptap/pm@3.32.0)
+      '@tiptap/pm': 3.32.0
+      '@tiptap/y-tiptap': 3.3.1(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
+
+  '@tiptap/extension-collaboration@3.35.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(@tiptap/y-tiptap@3.3.1(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(yjs@13.6.33)':
+    dependencies:
+      '@tiptap/core': 3.32.0(@tiptap/pm@3.32.0)
+      '@tiptap/pm': 3.32.0
+      '@tiptap/y-tiptap': 3.3.1(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
+      yjs: 13.6.33
+
   '@tiptap/extension-color@3.32.0(@tiptap/extension-text-style@3.32.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0)))':
     dependencies:
       '@tiptap/extension-text-style': 3.32.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))
@@ -3410,6 +3503,16 @@ snapshots:
     optionalDependencies:
       '@tiptap/extension-bubble-menu': 3.32.0(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)
       '@tiptap/extension-floating-menu': 3.32.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)
+
+  '@tiptap/y-tiptap@3.3.1(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-view@1.42.7)(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)':
+    dependencies:
+      lib0: 0.2.120
+      prosemirror-model: 1.25.12
+      prosemirror-state: 1.4.4
+      prosemirror-transform: 1.12.4
+      prosemirror-view: 1.42.7
+      y-protocols: 1.0.7(yjs@13.6.33)
+      yjs: 13.6.33
 
   '@types/chai@5.2.3':
     dependencies:
@@ -3727,7 +3830,7 @@ snapshots:
       '@vue/reactivity': 3.5.44
       '@vue/runtime-core': 3.5.44
       '@vue/shared': 3.5.44
-      csstype: 3.2.3
+      csstype: 3.2.4
 
   '@vue/server-renderer@3.5.44':
     dependencies:
@@ -3763,6 +3866,12 @@ snapshots:
   '@vueuse/shared@15.0.0(vue@3.5.44(typescript@6.0.3))':
     dependencies:
       vue: 3.5.44(typescript@6.0.3)
+
+  '@vxe-ui/core@4.5.10(vue@3.5.44(typescript@6.0.3))':
+    dependencies:
+      dom-zindex: 1.0.8
+      vue: 3.5.44(typescript@6.0.3)
+      xe-utils: 4.3.0
 
   abbrev@5.0.0: {}
 
@@ -3900,7 +4009,7 @@ snapshots:
       mdn-data: 2.27.1
       source-map-js: 1.2.2
 
-  csstype@3.2.3: {}
+  csstype@3.2.4: {}
 
   cytoscape-cose-bilkent@4.1.0(cytoscape@3.34.4):
     dependencies:
@@ -4119,6 +4228,8 @@ snapshots:
 
   dijkstrajs@1.0.3: {}
 
+  dom-zindex@1.0.8: {}
+
   dompurify@3.4.17:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
@@ -4299,6 +4410,8 @@ snapshots:
 
   isarray@1.0.0: {}
 
+  isomorphic.js@0.2.5: {}
+
   js-beautify@2.0.3:
     dependencies:
       config-chain: 1.1.13
@@ -4369,6 +4482,10 @@ snapshots:
   layout-base@1.0.2: {}
 
   layout-base@2.0.1: {}
+
+  lib0@0.2.120:
+    dependencies:
+      isomorphic.js: 0.2.5
 
   lie@3.3.0:
     dependencies:
@@ -5152,6 +5269,14 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
+  vxe-pc-ui@4.21.7(vue@3.5.44(typescript@6.0.3)):
+    dependencies:
+      '@vxe-ui/core': 4.5.10(vue@3.5.44(typescript@6.0.3))
+    transitivePeerDependencies:
+      - vue
+
+  vxe-table@4.24.5: {}
+
   w3c-keyname@2.2.8: {}
 
   w3c-xmlserializer@6.0.0:
@@ -5189,9 +5314,16 @@ snapshots:
 
   ws@8.22.1: {}
 
+  xe-utils@4.3.0: {}
+
   xml-name-validator@5.0.0: {}
 
   xmlchars@2.2.0: {}
+
+  y-protocols@1.0.7(yjs@13.6.33):
+    dependencies:
+      lib0: 0.2.120
+      yjs: 13.6.33
 
   y18n@4.0.3: {}
 
@@ -5213,6 +5345,10 @@ snapshots:
       which-module: 2.0.1
       y18n: 4.0.3
       yargs-parser: 18.1.3
+
+  yjs@13.6.33:
+    dependencies:
+      lib0: 0.2.120
 
   zrender@5.6.1:
     dependencies:

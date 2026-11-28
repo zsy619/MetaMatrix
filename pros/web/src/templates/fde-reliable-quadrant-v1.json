@@ -1,0 +1,231 @@
+{
+  "id": "canvas_fde_reliable",
+  "type": "quadrant",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "diagonal-lines",
+      "color": "#f7f7f7"
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "axes": {
+    "x": {
+      "leftLabel": "想清楚",
+      "rightLabel": "控得住"
+    },
+    "y": {
+      "topLabel": "",
+      "bottomLabel": ""
+    }
+  },
+  "quadrants": [
+    {
+      "position": "top-left",
+      "title": "架构与任务拆解",
+      "tag": {
+        "text": "能做出来",
+        "bgColor": "#FBEFF2",
+        "color": "#84344C"
+      },
+      "backgroundColor": "#FBEFF2",
+      "watermark": {
+        "letter": "A",
+        "text": "ARCH",
+        "color": "#A84562",
+        "position": "bottom-right"
+      },
+      "items": [
+        {
+          "id": "item_arch_goal",
+          "text": "先把业务目标拆成工作流，再写 prompt",
+          "style": {
+            "color": "#84344C",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "item_arch_agents",
+          "text": "说得清用单 Agent 还是多 Agent，为什么",
+          "style": {
+            "color": "#84344C",
+            "fontSize": 13
+          }
+        },
+        {
+          "id": "item_arch_split",
+          "text": "哪里走确定性编排，哪里交给模型判断，分得开",
+          "style": {
+            "color": "#84344C",
+            "fontSize": 13
+          }
+        },
+        {
+          "id": "item_arch_failure",
+          "text": "角色边界和失败路径事先画好",
+          "style": {
+            "color": "#84344C",
+            "fontSize": 13
+          }
+        }
+      ]
+    },
+    {
+      "position": "top-right",
+      "title": "工具调用与上下文工程",
+      "tag": {
+        "text": "能做出来",
+        "bgColor": "#E8F1FA",
+        "color": "#1C4C7C"
+      },
+      "backgroundColor": "#E8F1FA",
+      "watermark": {
+        "letter": "C",
+        "text": "CONT",
+        "color": "#2A649F",
+        "position": "bottom-right"
+      },
+      "items": [
+        {
+          "id": "item_ctx_tools",
+          "text": "工具粒度、返回结构、重试和补偿都有设计",
+          "style": {
+            "color": "#1C4C7C",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "item_ctx_cost",
+          "text": "懂 MCP / Function Calling 的边界和成本",
+          "style": {
+            "color": "#1C4C7C",
+            "fontSize": 13
+          }
+        },
+        {
+          "id": "item_ctx_layers",
+          "text": "上下文分层裁剪，状态外置，按需注入",
+          "style": {
+            "color": "#1C4C7C",
+            "fontSize": 13
+          }
+        },
+        {
+          "id": "item_ctx_stuffing",
+          "text": "不靠往上下文里多塞东西来解决问题",
+          "style": {
+            "color": "#1C4C7C",
+            "fontSize": 13
+          }
+        }
+      ]
+    },
+    {
+      "position": "bottom-left",
+      "title": "评测与可观测性",
+      "tag": {
+        "text": "能交付",
+        "bgColor": "#E7F6EF",
+        "color": "#125C3B"
+      },
+      "backgroundColor": "#E7F6EF",
+      "watermark": {
+        "letter": "E",
+        "text": "EVAL",
+        "color": "#187A4E",
+        "position": "bottom-right"
+      },
+      "items": [
+        {
+          "id": "item_eval_set",
+          "text": "第一天就建评测集和回归用例",
+          "style": {
+            "color": "#125C3B",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "item_eval_metric",
+          "text": "能定义什么叫变好了，不靠体感调 prompt",
+          "style": {
+            "color": "#125C3B",
+            "fontSize": 13
+          }
+        },
+        {
+          "id": "item_eval_trace",
+          "text": "线上有 trace，出错能定位到哪一步",
+          "style": {
+            "color": "#125C3B",
+            "fontSize": 13
+          }
+        },
+        {
+          "id": "item_eval_gate",
+          "text": "每次改动先过回归再上线",
+          "style": {
+            "color": "#125C3B",
+            "fontSize": 13
+          }
+        }
+      ]
+    },
+    {
+      "position": "bottom-right",
+      "title": "生产可靠性与人机协同",
+      "tag": {
+        "text": "能交付",
+        "bgColor": "#F3EEF8",
+        "color": "#4E3574"
+      },
+      "backgroundColor": "#F3EEF8",
+      "watermark": {
+        "letter": "R",
+        "text": "RELI",
+        "color": "#6B4C9A",
+        "position": "bottom-right"
+      },
+      "items": [
+        {
+          "id": "item_rel_guard",
+          "text": "降级、限流、幂等、灰度都亲手做过",
+          "style": {
+            "color": "#4E3574",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "item_rel_scope",
+          "text": "AI 的权限边界写得明确",
+          "style": {
+            "color": "#4E3574",
+            "fontSize": 13
+          }
+        },
+        {
+          "id": "item_rel_review",
+          "text": "关键节点留人工审核卡点",
+          "style": {
+            "color": "#4E3574",
+            "fontSize": 13
+          }
+        },
+        {
+          "id": "item_rel_human",
+          "text": "知道哪些事必须人拍板，不追求全自动",
+          "style": {
+            "color": "#4E3574",
+            "fontSize": 13
+          }
+        }
+      ]
+    }
+  ],
+  "markers": []
+}

@@ -18,7 +18,16 @@ import {
 import { buildDataSourceRequest, type ChartDataSourceRequest } from './chartDataRequest'
 import { applyMappedDataToOption, mapResponseToChartData } from './chartDataMapping'
 import { readChartSecret } from './chartSecret'
+import { fetchChartData } from './chartDataFetch'
 import { getToken } from '../../api/http'
+
+// 保留原模块的公共导出，既有调用方无需感知网络实现已经拆分。
+export {
+  DEFAULT_CHART_REQUEST_TIMEOUT_MS,
+  DEFAULT_CHART_RESPONSE_MAX_BYTES,
+  fetchChartData,
+} from './chartDataFetch'
+export type { FetchChartDataOptions } from './chartDataFetch'
 
 /** 取当前系统登录态的 token（没有登录就是 null）。 */
 export type SessionTokenReader = () => string | null
@@ -45,29 +54,6 @@ export function resolveChartDataRequest(
 /** 从图表块属性里的 dataSource 文本解析配置。 */
 export function resolveDataSourceConfig(raw: unknown): ChartDataSourceConfig {
   return parseDataSourceConfig(raw)
-}
-
-/** 拉取接口数据（返回原始响应体）。 */
-export async function fetchChartData(
-  request: ChartDataSourceRequest,
-  fetchImpl: typeof fetch = fetch,
-): Promise<unknown> {
-  const init: RequestInit = {
-    method: request.method,
-    headers: request.headers,
-  }
-  if (request.body) init.body = request.body
-  const response = await fetchImpl(request.url, init)
-  if (!response.ok) {
-    throw new Error(`接口请求失败：HTTP ${response.status}`)
-  }
-  const text = await response.text()
-  if (!text.trim()) return null
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new Error('接口响应不是合法 JSON')
-  }
 }
 
 /**
@@ -100,6 +86,26 @@ export function mergeChartDataIntoOption(
   return applyMappedDataToOption(next, mapped)
 }
 
+/**
+ * 可注入的页面可见性机制。测试无需篡改全局 document，宿主也可接入自己的生命周期。
+ * subscribe 必须返回取消订阅函数，stop 时会一并释放。
+ */
+export type ChartVisibilitySource = {
+  isHidden: () => boolean
+  subscribe: (listener: () => void) => () => void
+}
+
+function browserChartVisibility(): ChartVisibilitySource {
+  return {
+    isHidden: () => typeof document !== 'undefined' && document.hidden,
+    subscribe: listener => {
+      if (typeof document === 'undefined') return () => undefined
+      document.addEventListener('visibilitychange', listener)
+      return () => document.removeEventListener('visibilitychange', listener)
+    },
+  }
+}
+
 /** 轮询句柄。 */
 export type ChartDataPoller = {
   /** 停止刷新。 */
@@ -128,6 +134,12 @@ export type StartChartDataPollingOptions = {
   setTimeoutImpl?: typeof setTimeout
   /** 清除定时器（测试用）。 */
   clearTimeoutImpl?: typeof clearTimeout
+  /** 单轮请求总超时，默认 15 秒。 */
+  requestTimeoutMs?: number
+  /** 响应体 UTF-8 字节上限，默认 5MiB。 */
+  maxResponseBytes?: number
+  /** 页面可见性来源；隐藏时暂停并中止，恢复时立即刷新一次。 */
+  visibility?: ChartVisibilitySource
 }
 
 /**
@@ -146,44 +158,103 @@ export function startChartDataPolling(options: StartChartDataPollingOptions): Ch
     fetchImpl,
     setTimeoutImpl = setTimeout,
     clearTimeoutImpl = clearTimeout,
+    requestTimeoutMs,
+    maxResponseBytes,
+    visibility = browserChartVisibility(),
   } = options
   let stopped = false
+  let hidden = visibility.isHidden()
   let timer: ReturnType<typeof setTimeout> | null = null
+  let activeController: AbortController | null = null
+  let activePromise: Promise<Record<string, unknown> | null> | null = null
+  // 每次新请求、停止或隐藏都会推进代次；旧请求即使无视取消并迟到，也无法通过校验。
+  let requestVersion = 0
 
-  const refresh = async (): Promise<Record<string, unknown> | null> => {
-    if (stopped || !config.enabled || !config.url) return null
-    try {
-      const request = resolveChartDataRequest(config, chartId, sessionToken())
-      const payload = await fetchChartData(request, fetchImpl)
-      if (stopped) return null
-      const merged = mergeChartDataIntoOption(option(), payload, config)
-      onOption(merged)
-      return merged
-    } catch (err) {
-      if (!stopped) {
-        onError?.(err instanceof Error ? err.message : String(err))
-      }
-      return null
-    }
+  const clearScheduledRefresh = () => {
+    if (timer !== null) clearTimeoutImpl(timer)
+    timer = null
   }
 
+  const startRefresh = (force = false): Promise<Record<string, unknown> | null> => {
+    if (stopped || hidden || !config.enabled || !config.url) return Promise.resolve(null)
+    // 手动重复 refresh 复用在途 Promise；定时器仍在 finally 后调度，避免常规轮询重叠。
+    if (activePromise && !force) return activePromise
+    // 页面恢复要求立即发新请求：旧请求先失效并被中止，不必等待一个无视 signal 的实现返回。
+    if (activePromise) activeController?.abort()
+
+    const controller = new AbortController()
+    const version = ++requestVersion
+    activeController = controller
+    const promise = (async (): Promise<Record<string, unknown> | null> => {
+      try {
+        const request = resolveChartDataRequest(config, chartId, sessionToken())
+        const payload = await fetchChartData(request, fetchImpl, {
+          signal: controller.signal,
+          timeoutMs: requestTimeoutMs,
+          maxResponseBytes,
+          setTimeoutImpl,
+          clearTimeoutImpl,
+        })
+        if (stopped || hidden || controller.signal.aborted || version !== requestVersion) return null
+        const merged = mergeChartDataIntoOption(option(), payload, config)
+        onOption(merged)
+        return merged
+      } catch (err) {
+        // 主动停止、隐藏和被新请求取代都属于取消，不应把 AbortError 当成接口故障提示。
+        if (!stopped && !hidden && !controller.signal.aborted && version === requestVersion) {
+          onError?.(err instanceof Error ? err.message : String(err))
+        }
+        return null
+      }
+    })()
+    activePromise = promise
+    void promise.finally(() => {
+      // 旧请求的 finally 不能清掉恢复后新请求的控制器与 Promise。
+      if (activePromise === promise) {
+        activePromise = null
+        activeController = null
+      }
+    })
+    return promise
+  }
+
+  const refresh = () => startRefresh(false)
   const schedule = () => {
-    if (stopped) return
+    if (stopped || hidden || timer !== null || activePromise) return
     const seconds = config.refreshInterval
     if (!seconds || seconds <= 0) return
     timer = setTimeoutImpl(() => {
       timer = null
-      void refresh().finally(schedule)
+      void startRefresh(false).finally(schedule)
     }, Math.max(1, seconds) * 1000)
   }
 
-  void refresh().finally(schedule)
+  const onVisibilityChange = () => {
+    if (stopped) return
+    const nextHidden = visibility.isHidden()
+    if (nextHidden === hidden) return
+    hidden = nextHidden
+    if (hidden) {
+      // 隐藏不仅清定时器，也使当前响应失效并中止网络，后台标签页不再消耗接口配额。
+      requestVersion += 1
+      clearScheduledRefresh()
+      activeController?.abort()
+      return
+    }
+    // 恢复可见时不等待原刷新间隔，立即刷新一次；完成后再恢复正常 finally 调度。
+    void startRefresh(true).finally(schedule)
+  }
+  const unsubscribeVisibility = visibility.subscribe(onVisibilityChange)
+  void startRefresh(false).finally(schedule)
 
   return {
     stop() {
+      if (stopped) return
       stopped = true
-      if (timer) clearTimeoutImpl(timer)
-      timer = null
+      requestVersion += 1
+      clearScheduledRefresh()
+      activeController?.abort()
+      unsubscribeVisibility()
     },
     refresh,
   }

@@ -7,17 +7,21 @@
 
 import type { Editor } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import type { EditorState, Transaction } from '@tiptap/pm/state'
+import { EditorState, type Transaction } from '@tiptap/pm/state'
 import {
   evaluateFormula,
   evaluateTableFormulas,
   formatCellAddress,
   isFormulaCell,
+  remapFormulaByAxis,
   type FormulaErrorCode,
 } from './rteTableFormula'
 
 /** 自动重算事务的标记，避免写回结果后再触发一轮。 */
 export const TABLE_FORMULA_RECALC = 'tableFormulaRecalc'
+
+/** 排序、合计这类整表改写。公式要跟着重算，不能当成用户改了格子而清掉。 */
+export const TABLE_STRUCTURE = 'tableStructure'
 
 /** 定位到的单元格。 */
 export type TableCellLocation = {
@@ -73,7 +77,7 @@ export function findSelectedCell(state: {
     if (!row || row.type.name !== 'tableRow') return null
     if (!table || table.type.name !== 'table') return null
     const rowIndex = headCell.index(depth - 1)
-    const colIndex = headCell.index(depth)
+    const colIndex = visualCellColumn(table, rowIndex, headCell.index(depth))
     if (rowIndex < 0 || colIndex < 0) return null
     const tablePos = headCell.before(depth - 1)
     const cellPos = cellPosition(tablePos, table, rowIndex, colIndex)
@@ -103,8 +107,8 @@ export function findSelectedCell(state: {
   if ($head.node(rowDepth).type.name !== 'tableRow') return null
   if ($head.node(tableDepth).type.name !== 'table') return null
   const rowIndex = $head.index(tableDepth)
-  const colIndex = $head.index(rowDepth)
   const table = $head.node(tableDepth)
+  const colIndex = visualCellColumn(table, rowIndex, $head.index(rowDepth))
   const tablePos = $head.before(tableDepth)
   const cellPos = cellPosition(tablePos, table, rowIndex, colIndex)
   if (cellPos == null) return null
@@ -127,16 +131,22 @@ export function findSelectedCell(state: {
  */
 export function cellPosition(tablePos: number, table: PmNode, rowIndex: number, colIndex: number): number | null {
   let found: number | null = null
+  const occupied: boolean[][] = []
   table.forEach((rowNode, rowOffset, rowIdx) => {
     if (found != null) return false
-    if (rowIdx !== rowIndex) return
     const rowPos = tablePos + 1 + rowOffset
     let cellPos = rowPos + 1
     let col = 0
     rowNode.forEach((cellNode) => {
-      if (col === colIndex) found = cellPos
+      while (occupied[rowIdx]?.[col]) col += 1
+      const { colspan, rowspan } = cellSpan(cellNode)
+      if (rowIdx === rowIndex && col === colIndex) found = cellPos
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!occupied[rowIdx + down]) occupied[rowIdx + down] = []
+        for (let span = 0; span < colspan; span += 1) occupied[rowIdx + down]![col + span] = true
+      }
       cellPos += cellNode.nodeSize
-      col += 1
+      col += colspan
     })
   })
   return found
@@ -155,21 +165,102 @@ export function cellDisplayText(cell: PmNode): string {
   return (cell.textContent || '').trim()
 }
 
+function cellSpan(cell: PmNode): { colspan: number; rowspan: number } {
+  return {
+    colspan: Math.max(1, Number(cell.attrs.colspan) || 1),
+    rowspan: Math.max(1, Number(cell.attrs.rowspan) || 1),
+  }
+}
+
+/** 把合并单元格铺成矩形网格。被跨过的格子是空字符串，起点格用 textOf。 */
+export function tableTextGrid(table: PmNode, textOf: (cell: PmNode) => string): string[][] {
+  const grid: string[][] = []
+  const occupied: boolean[][] = []
+  let rowIndex = 0
+  table.forEach((rowNode) => {
+    let col = 0
+    rowNode.forEach((cellNode) => {
+      while (occupied[rowIndex]?.[col]) col += 1
+      const text = textOf(cellNode)
+      const { colspan, rowspan } = cellSpan(cellNode)
+      for (let row = 0; row < rowspan; row += 1) {
+        if (!grid[rowIndex + row]) grid[rowIndex + row] = []
+        if (!occupied[rowIndex + row]) occupied[rowIndex + row] = []
+        for (let span = 0; span < colspan; span += 1) {
+          const covered = grid[rowIndex + row]![col + span]
+          grid[rowIndex + row]![col + span] = row === 0 && span === 0 ? text : (covered ?? '')
+          occupied[rowIndex + row]![col + span] = true
+        }
+      }
+      col += colspan
+    })
+    rowIndex += 1
+  })
+  const height = rowIndex
+  const width = Math.max(0, ...grid.slice(0, height).map((row) => row.length))
+  return Array.from({ length: height }, (_, index) => {
+    const row = grid[index] ?? []
+    return Array.from({ length: width }, (_, col) => row[col] ?? '')
+  })
+}
+
+/** 子单元格在视觉网格里的起始列。上一行的 rowspan 会把后面的格子往右推。 */
+export function visualCellColumn(table: PmNode, rowIndex: number, childIndex: number): number {
+  let result = childIndex
+  const occupied: boolean[][] = []
+  let row = 0
+  table.forEach((rowNode) => {
+    let col = 0
+    let child = 0
+    rowNode.forEach((cellNode) => {
+      while (occupied[row]?.[col]) col += 1
+      if (row === rowIndex && child === childIndex) result = col
+      const { colspan, rowspan } = cellSpan(cellNode)
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!occupied[row + down]) occupied[row + down] = []
+        for (let span = 0; span < colspan; span += 1) occupied[row + down]![col + span] = true
+      }
+      col += colspan
+      child += 1
+    })
+    row += 1
+  })
+  return result
+}
+
 /** 表格的原始文本网格（公式单元格取公式原文，其它取显示文本）。 */
 export function tableGrid(table: PmNode): string[][] {
-  const grid: string[][] = []
-  table.forEach((rowNode) => {
-    const row: string[] = []
-    rowNode.forEach((cellNode) => {
-      const formula = cellFormulaText(cellNode)
-      const text = formula || cellDisplayText(cellNode)
-      const span = Math.max(1, Number(cellNode.attrs.colspan) || 1)
-      row.push(text)
-      for (let extra = 1; extra < span; extra += 1) row.push('')
+  return tableTextGrid(table, (cell) => cellFormulaText(cell) || cellDisplayText(cell))
+}
+
+export type TableFormulaUpdate = {
+  rowIndex: number
+  childIndex: number
+  formula: string
+  display: string
+  next: string
+}
+
+/** 按视觉列重算。合并单元格占掉的列也算进地址，公式不会读到旁边那一格。 */
+export function tableFormulaUpdates(table: PmNode): TableFormulaUpdate[] {
+  const { grid } = evaluateTableFormulas(tableGrid(table))
+  const updates: TableFormulaUpdate[] = []
+  table.forEach((row, _rowOffset, rowIndex) => {
+    if (row.type.name !== 'tableRow') return
+    row.forEach((cell, _cellOffset, childIndex) => {
+      const formula = cellFormulaText(cell)
+      if (!formula) return
+      const colIndex = visualCellColumn(table, rowIndex, childIndex)
+      updates.push({
+        rowIndex,
+        childIndex,
+        formula,
+        display: cellDisplayText(cell),
+        next: grid[rowIndex]?.[colIndex] ?? '',
+      })
     })
-    grid.push(row)
   })
-  return grid
+  return updates
 }
 
 /** 回写结果。 */
@@ -213,8 +304,9 @@ export function applyCellInput(editor: Editor, loc: TableCellLocation, input: st
     cellPos += 1
     const cellNodes: PmNode[] = []
     rowNode.forEach((cellNode) => cellNodes.push(cellNode))
-    for (let colIndex = 0; colIndex < cellNodes.length; colIndex += 1) {
-      const cellNode = cellNodes[colIndex]!
+    for (let childIndex = 0; childIndex < cellNodes.length; childIndex += 1) {
+      const cellNode = cellNodes[childIndex]!
+      const colIndex = visualCellColumn(loc.table, rowIndex, childIndex)
       const nextText = computed[rowIndex]?.[colIndex] ?? cellDisplayText(cellNode)
       const isTarget = rowIndex === loc.rowIndex && colIndex === loc.colIndex
       const nextFormula = isTarget ? (isFormula ? trimmed : '') : cellFormulaText(cellNode)
@@ -300,8 +392,9 @@ export function formulaRecalcTransaction(
     node.forEach((rowNode, rowOffset) => {
       const rowPos = pos + 1 + rowOffset
       let cellPos = rowPos + 1
-      let colIndex = 0
+      let childIndex = 0
       rowNode.forEach((cellNode) => {
+        const colIndex = visualCellColumn(node, rowIndex, childIndex)
         const stored = typeof cellNode.attrs?.formula === 'string' ? cellNode.attrs.formula.trim() : ''
         if (stored) {
           const display = cellDisplayText(cellNode)
@@ -318,7 +411,7 @@ export function formulaRecalcTransaction(
           }
         }
         cellPos += cellNode.nodeSize
-        colIndex += 1
+        childIndex += 1
       })
       rowIndex += 1
     })
@@ -348,4 +441,226 @@ export function formulaRecalcTransaction(
   if (!tr.docChanged) return null
   tr.setMeta(TABLE_FORMULA_RECALC, true)
   return tr
+}
+
+type AxisMap = Map<number, number | null>
+
+function tableRows(table: PmNode): PmNode[] {
+  const rows: PmNode[] = []
+  table.forEach((row) => {
+    if (row.type.name === 'tableRow') rows.push(row)
+  })
+  return rows
+}
+
+function tableHasMerge(table: PmNode): boolean {
+  let merged = false
+  tableRows(table).forEach((row) => {
+    row.forEach((cell) => {
+      if (Number(cell.attrs.colspan) > 1 || Number(cell.attrs.rowspan) > 1) merged = true
+    })
+  })
+  return merged
+}
+
+function cellAnchors(table: PmNode): Map<PmNode, { row: number; col: number }> {
+  const anchors = new Map<PmNode, { row: number; col: number }>()
+  tableRows(table).forEach((row, rowIndex) => {
+    row.forEach((cell, _offset, colIndex) => {
+      anchors.set(cell, { row: rowIndex + 1, col: colIndex + 1 })
+    })
+  })
+  return anchors
+}
+
+function colWidth(table: PmNode): number {
+  return tableRows(table).reduce((max, row) => Math.max(max, row.childCount), 0)
+}
+
+function missingIndexes(size: number, present: Set<number>): number[] {
+  const missing: number[] = []
+  for (let index = 1; index <= size; index += 1) {
+    if (!present.has(index)) missing.push(index)
+  }
+  return missing
+}
+
+function voteAxis(
+  pairs: Array<{ from: number; to: number }>,
+  fromSize: number,
+  missing: number[],
+): AxisMap | null {
+  const votes = new Map<number, Set<number>>()
+  for (const pair of pairs) {
+    const bucket = votes.get(pair.from) ?? new Set<number>()
+    bucket.add(pair.to)
+    votes.set(pair.from, bucket)
+  }
+  const map: AxisMap = new Map()
+  for (const [from, bucket] of votes) {
+    if (bucket.size !== 1) return null
+    map.set(from, [...bucket][0]!)
+  }
+  for (const index of missing) map.set(index, null)
+  if (map.size !== fromSize) return null
+  return map
+}
+
+function axisSame(map: AxisMap, size: number): boolean {
+  if (map.size !== size) return false
+  for (let index = 1; index <= size; index += 1) {
+    if (map.get(index) !== index) return false
+  }
+  return true
+}
+
+function formulaKey(row: PmNode): string | null {
+  const parts: string[] = []
+  let any = false
+  row.forEach((cell) => {
+    const stored = typeof cell.attrs.formula === 'string' ? cell.attrs.formula.trim() : ''
+    const text = cell.textContent.trim()
+    const formula = stored.startsWith('=') ? stored : text.startsWith('=') ? text : ''
+    if (formula) any = true
+    parts.push(formula)
+  })
+  return any ? parts.join('\u0001') : null
+}
+
+function planTableShift(oldTable: PmNode, newTable: PmNode): {
+  rowMap: AxisMap
+  colMap: AxisMap
+  duplicateDeltas: Map<number, number>
+} | null {
+  if (tableHasMerge(oldTable) || tableHasMerge(newTable)) return null
+  const oldRows = tableRows(oldTable)
+  const newRows = tableRows(newTable)
+  const oldAnchors = cellAnchors(oldTable)
+  const newAnchors = cellAnchors(newTable)
+  const pairs: Array<{ oldRow: number; oldCol: number; newRow: number; newCol: number }> = []
+  newAnchors.forEach((neu, cell) => {
+    const old = oldAnchors.get(cell)
+    if (!old) return
+    pairs.push({ oldRow: old.row, oldCol: old.col, newRow: neu.row, newCol: neu.col })
+  })
+  if (!pairs.length) return null
+  const oldRowCount = oldRows.length
+  const newRowCount = newRows.length
+  const oldColCount = colWidth(oldTable)
+  const newColCount = colWidth(newTable)
+  const matchedOldRows = new Set(pairs.map((pair) => pair.oldRow))
+  const matchedNewRows = new Set(pairs.map((pair) => pair.newRow))
+  const matchedOldCols = new Set(pairs.map((pair) => pair.oldCol))
+  const matchedNewCols = new Set(pairs.map((pair) => pair.newCol))
+  const unmatchedOldRows = missingIndexes(oldRowCount, matchedOldRows)
+  const unmatchedNewRows = missingIndexes(newRowCount, matchedNewRows)
+  const unmatchedOldCols = missingIndexes(oldColCount, matchedOldCols)
+  const unmatchedNewCols = missingIndexes(newColCount, matchedNewCols)
+  const sameShape = oldRowCount === newRowCount && oldColCount === newColCount
+  if (sameShape && unmatchedOldRows.length && unmatchedNewRows.length) return null
+  if (sameShape && unmatchedOldCols.length && unmatchedNewCols.length) return null
+  if (unmatchedNewRows.length && unmatchedNewCols.length) return null
+  if (unmatchedOldRows.length && unmatchedOldCols.length) return null
+  if (unmatchedNewRows.length && unmatchedOldCols.length) return null
+  if (unmatchedOldRows.length && unmatchedNewCols.length) return null
+  const rowMap = voteAxis(
+    pairs.map((pair) => ({ from: pair.oldRow, to: pair.newRow })),
+    oldRowCount,
+    unmatchedOldRows,
+  )
+  const colMap = voteAxis(
+    pairs.map((pair) => ({ from: pair.oldCol, to: pair.newCol })),
+    oldColCount,
+    unmatchedOldCols,
+  )
+  if (!rowMap || !colMap) return null
+  const duplicateDeltas = new Map<number, number>()
+  for (const rowIndex of unmatchedNewRows) {
+    if (rowIndex < 2) continue
+    const row = newRows[rowIndex - 1]
+    const prev = newRows[rowIndex - 2]
+    if (!row || !prev) continue
+    const key = formulaKey(row)
+    if (key && key === formulaKey(prev)) duplicateDeltas.set(rowIndex, 1)
+  }
+  if (axisSame(rowMap, oldRowCount) && axisSame(colMap, oldColCount) && !duplicateDeltas.size) return null
+  return { rowMap, colMap, duplicateDeltas }
+}
+
+function mapPosBackward(pos: number, transactions: readonly Transaction[]): number {
+  let at = pos
+  for (let index = transactions.length - 1; index >= 0; index -= 1) {
+    at = transactions[index]!.mapping.invert().map(at, -1)
+  }
+  return at
+}
+
+/**
+ * 插入、删除、移动行列后，公式地址跟着原来的格子走。
+ * 复制出来的行按相对位置再错一格。返回的事务已经带上重算。
+ */
+export function formulaFollowTransaction(
+  oldState: EditorState,
+  newState: EditorState,
+  transactions: readonly Transaction[],
+): Transaction | null {
+  const jobs: Array<{ cellPos: number; formula: string }> = []
+  newState.doc.descendants((node, pos) => {
+    if (node.type.name !== 'table') return
+    const oldNode = oldState.doc.nodeAt(mapPosBackward(pos, transactions))
+    if (!oldNode || oldNode.type.name !== 'table' || oldNode === node) return
+    const plan = planTableShift(oldNode, node)
+    if (!plan) return
+    let rowIndex = 0
+    node.forEach((rowNode, rowOffset) => {
+      if (rowNode.type.name !== 'tableRow') return
+      const rowNumber = rowIndex + 1
+      rowIndex += 1
+      const rowPos = pos + 1 + rowOffset
+      let cellPos = rowPos + 1
+      const delta = plan.duplicateDeltas.get(rowNumber)
+      const mapRow = delta
+        ? (row: number) => {
+            const next = row + delta
+            return next >= 1 ? next : null
+          }
+        : (row: number) => (plan.rowMap.has(row) ? plan.rowMap.get(row)! : row)
+      const mapCol = (col: number) => (plan.colMap.has(col) ? plan.colMap.get(col)! : col)
+      rowNode.forEach((cell) => {
+        const formula = cellFormulaText(cell)
+        if (formula.startsWith('=')) {
+          const next = remapFormulaByAxis(formula, mapRow, mapCol)
+          if (next !== formula) jobs.push({ cellPos, formula: next })
+        }
+        cellPos += cell.nodeSize
+      })
+    })
+  })
+  if (!jobs.length) return null
+  let shifted = newState.tr
+  jobs.sort((a, b) => b.cellPos - a.cellPos)
+  for (const job of jobs) {
+    const cell = shifted.doc.nodeAt(job.cellPos)
+    if (!cell) continue
+    shifted = shifted.setNodeMarkup(job.cellPos, undefined, { ...cell.attrs, formula: job.formula })
+    const live = shifted.doc.nodeAt(job.cellPos)
+    const first = live?.firstChild
+    if (!first || !isFormulaCell(first.textContent || '')) continue
+    const from = job.cellPos + 2
+    const to = job.cellPos + first.nodeSize
+    if (to <= from) continue
+    shifted = shifted.replaceWith(from, to, newState.schema.text(job.formula))
+  }
+  if (!shifted.docChanged) return null
+  // 不用 newState.apply：那会再跑一遍插件，把显示结果算进另一个状态，步骤却留在原地。
+  const bare = EditorState.create({ schema: newState.schema, doc: shifted.doc })
+  const recalc = formulaRecalcTransaction(bare, [])
+  if (recalc) {
+    for (const step of recalc.steps) {
+      if (shifted.maybeStep(step).failed) break
+    }
+  }
+  if (!shifted.docChanged) return null
+  shifted.setMeta(TABLE_FORMULA_RECALC, true)
+  return shifted
 }

@@ -5,6 +5,9 @@
  * - 新建即带出六段（二级标题 + 一行占位文字），与富文本文档模板文案一致；
  * - 富文本里改内容会写回文档 JSON（通用 block store 通道），保存重开仍在。
  */
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -181,13 +184,21 @@ describe('画布组件 · 上下文六要素', () => {
       props: { doc: store.current_data as never },
     })
 
-    const text = wrapper.text()
+    const text = `${wrapper.text()}\n${document.body.textContent ?? ''}`
     for (const title of TITLES) {
       expect(text, `缺少标题 ${title}`).toContain(title)
     }
     for (const placeholder of PLACEHOLDERS) {
       expect(text, `缺少占位 ${placeholder}`).toContain(placeholder)
     }
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ContextSixElementsCanvas.vue'), 'utf8')
+    expect(source).toContain('padding: 12px 12px 16px')
+    expect(source).toContain('font-size: 15px')
+    expect(source).toContain('class="pm-max-btn cse-max"')
+    expect(source).toContain(':expanded="true"')
+    expect(source).toContain(':page-sheet="false"')
+    expect(source).toContain('min-height: 100%')
+    expect(document.body.querySelector('.pm-overlay')).toBeTruthy()
   })
 
   it('编辑器里改内容后写回文档 JSON', async () => {

@@ -1,5 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  Back,
+  Connection,
+  Delete,
+  Flag,
+  Position,
+  Remove,
+  Right,
+  Sort,
+  Tickets,
+  Upload,
+} from '@element-plus/icons-vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { GanttTask, ProjectGanttDocumentJSON } from '../../types/canvas'
 import { isProjectGanttDoc } from '../../types/canvas'
@@ -8,8 +20,17 @@ import { dayNumber, newCanvasId } from '../../utils/classicCanvases'
 import {
   analyzeSchedule,
   applyDependencySchedule,
+  GANTT_SCALES,
+  buildGanttAxis,
   calendarSpan,
+  clampGanttPaneWidth,
+  dayBandPercent,
   finishFromStart,
+  formatGanttDateTime,
+  ganttDateTimeLocal,
+  ganttRange,
+  ganttUnitIndex,
+  normalizeGanttDateTime,
   formatPredecessors,
   formatSuccessors,
   indentTask,
@@ -23,28 +44,152 @@ import {
   removeGanttTask,
   scalePx,
   shiftIso,
+  zoomGanttScale,
   shiftWorkDays,
   taskDuration,
   taskHasChildren,
 } from '../../utils/projectGantt'
+import { parseMicrosoftProjectXml } from '../../utils/projectGanttImport'
 
 const props = defineProps<{ doc: ProjectGanttDocumentJSON }>()
 const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
-
-const ROW = 32
+const ROW = 44
 const HEAD = 40
+const headStride = ref(HEAD)
+const rowBoxes = ref<Array<{ top: number; height: number }>>([])
+const frame = computed(() => ({ ...chrome.value, '--gantt-row': `${ROW}px` }))
+
+function rowBox(index: number) {
+  return rowBoxes.value[index] ?? { top: index * ROW, height: ROW }
+}
+
+const chartBodyHeight = computed(() => {
+  const boxes = rowBoxes.value
+  if (!boxes.length) return visibleRows.value.length * ROW
+  const last = boxes[boxes.length - 1]
+  return last.top + last.height
+})
 const selectedId = ref<string | null>(null)
 const status = ref('')
 const preview = ref<Record<string, { start: string; end: string }>>({})
 const gridRef = ref<HTMLElement | null>(null)
 const chartRef = ref<HTMLElement | null>(null)
+const splitRef = ref<HTMLElement | null>(null)
+const projectFileRef = ref<HTMLInputElement | null>(null)
+const gridWidth = ref<number | null>(null)
+const narrowQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 900px)') : null
+const narrow = ref(narrowQuery?.matches ?? false)
+
+function onNarrowChange() {
+  narrow.value = !!narrowQuery?.matches
+}
+
+let wheelBucket = 0
+
+function onChartWheel(event: WheelEvent) {
+  const target = event.target
+  const onHead = target instanceof Element && !!target.closest('.chart-head')
+  if (!onHead && !event.ctrlKey && !event.metaKey) return
+  event.preventDefault()
+  wheelBucket += event.deltaY
+  if (Math.abs(wheelBucket) < 48) return
+  const direction = wheelBucket > 0 ? 1 : -1
+  wheelBucket = 0
+  setScale(zoomGanttScale(props.doc.scale, direction))
+}
+
+async function measureStride() {
+  await nextTick()
+  if (narrow.value) {
+    headStride.value = HEAD
+    rowBoxes.value = []
+    return
+  }
+  const tableHead = gridRef.value?.querySelector('thead')
+  const body = gridRef.value?.querySelector('tbody')
+  if (tableHead && getComputedStyle(tableHead).display !== 'none') {
+    const height = Math.round(tableHead.getBoundingClientRect().height)
+    if (height > 0) headStride.value = height
+  }
+  const chartBody = chartRef.value?.querySelector('.chart-body')
+  if (!body || !chartBody) return
+  const origin = chartBody.getBoundingClientRect().top
+  const next = [...body.querySelectorAll('tr')].map((row) => {
+    const rect = row.getBoundingClientRect()
+    return { top: rect.top - origin, height: rect.height }
+  })
+  const prev = rowBoxes.value
+  const same = prev.length === next.length && prev.every((box, index) => box.top === next[index].top && box.height === next[index].height)
+  if (!same) rowBoxes.value = next
+}
+
+onMounted(() => {
+  narrowQuery?.addEventListener('change', onNarrowChange)
+  chartRef.value?.addEventListener('wheel', onChartWheel, { passive: false })
+  void measureStride()
+  requestAnimationFrame(() => { void measureStride() })
+})
+onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', onNarrowChange)
+  chartRef.value?.removeEventListener('wheel', onChartWheel)
+})
+
+const gridPaneStyle = computed(() => (narrow.value || gridWidth.value == null ? {} : { width: `${gridWidth.value}px` }))
+
+function resizeGrid(clientX: number) {
+  const split = splitRef.value
+  if (!split || narrow.value) return
+  const bounds = split.getBoundingClientRect()
+  gridWidth.value = clampGanttPaneWidth(clientX - bounds.left, bounds.width)
+}
+
+function startSplit(event: PointerEvent) {
+  if (event.button !== 0 || narrow.value) return
+  event.preventDefault()
+  const handle = event.currentTarget as HTMLElement
+  handle.setPointerCapture?.(event.pointerId)
+  const previousCursor = document.body.style.cursor
+  const previousSelect = document.body.style.userSelect
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  const move = (ev: PointerEvent) => resizeGrid(ev.clientX)
+  const up = (ev: PointerEvent) => {
+    handle.removeEventListener('pointermove', move)
+    handle.removeEventListener('pointerup', up)
+    document.body.style.cursor = previousCursor
+    document.body.style.userSelect = previousSelect
+    try {
+      handle.releasePointerCapture?.(ev.pointerId)
+    } catch {
+      /* 指针已经松开 */
+    }
+  }
+  handle.addEventListener('pointermove', move)
+  handle.addEventListener('pointerup', up)
+  resizeGrid(event.clientX)
+}
+
+function onSplitKey(event: KeyboardEvent) {
+  if (narrow.value) return
+  const step = event.shiftKey ? 48 : 16
+  const delta = event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0
+  if (!delta) return
+  const split = splitRef.value
+  const grid = gridRef.value
+  if (!split || !grid) return
+  event.preventDefault()
+  const current = gridWidth.value ?? grid.getBoundingClientRect().width
+  gridWidth.value = clampGanttPaneWidth(current + delta, split.getBoundingClientRect().width)
+}
 let syncing = false
 
 const tasks = computed(() => props.doc.tasks)
 const analysis = computed(() => analyzeSchedule(tasks.value))
 const visibleRows = computed(() => outlineRows(tasks.value).filter((row) => !row.hidden))
-const px = computed(() => scalePx(props.doc.scale))
+watch(visibleRows, () => { void measureStride() })
+watch(narrow, () => { void measureStride() })
+const unit = computed(() => scalePx(props.doc.scale))
 
 function shown(task: GanttTask): GanttTask {
   const over = preview.value[task.id]
@@ -52,39 +197,20 @@ function shown(task: GanttTask): GanttTask {
 }
 
 const span = computed(() => calendarSpan(tasks.value.map((task) => shown(task))))
-const days = computed(() => {
-  const list: number[] = []
-  for (let day = span.value.min; day <= span.value.max; day += 1) list.push(day)
-  return list
-})
-const chartWidth = computed(() => Math.max(px.value, days.value.length * px.value))
-const months = computed(() => {
-  const groups: Array<{ label: string; days: number }> = []
-  for (const day of days.value) {
-    const label = isoFromDay(day).slice(0, 7)
-    const last = groups[groups.length - 1]
-    if (!last || last.label !== label) groups.push({ label, days: 1 })
-    else last.days += 1
-  }
-  return groups
-})
+const axis = computed(() => buildGanttAxis(span.value.min, span.value.max, props.doc.scale))
+const tickCount = computed(() => Math.max(1, axis.value.ticks.length))
+const naturalWidth = computed(() => tickCount.value * unit.value)
+const daySpan = computed(() => Math.max(1, axis.value.end - axis.value.start))
 
 const todayLeft = computed(() => {
   const now = new Date()
   const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const day = dayNumber(iso)
-  if (day == null || day < span.value.min || day > span.value.max) return null
-  return (day - span.value.min) * px.value + px.value / 2
+  if (day == null || day < axis.value.start || day >= axis.value.end) return null
+  return (ganttUnitIndex(day + 0.5, axis.value.ticks) / tickCount.value) * 100
 })
 
 const selectedIndex = computed(() => tasks.value.findIndex((task) => task.id === selectedId.value))
-
-function tickLabel(day: number): string {
-  const date = new Date(day * 86_400_000)
-  if (props.doc.scale === 'month') return ''
-  if (props.doc.scale !== 'day' && date.getUTCDay() !== 1) return ''
-  return String(date.getUTCDate())
-}
 
 function slackOf(id: string): number {
   return analysis.value.get(id)?.slack ?? 0
@@ -96,37 +222,47 @@ function isCritical(id: string): boolean {
 
 function barStyle(task: GanttTask): Record<string, string> {
   const box = barBox(task)
-  return box ? { left: `${box.left}px`, width: `${box.width}px` } : {}
+  return box ? { left: `${box.left}%`, width: `${box.width}%` } : {}
 }
 
 function milestoneStyle(task: GanttTask): Record<string, string> {
   const box = barBox(task)
-  return box ? { left: `${box.left + px.value / 2 - 7}px` } : {}
+  return box ? { left: `calc(${box.left + box.width / 2}% - 8px)` } : {}
 }
 
 function baselineStyle(task: GanttTask): Record<string, string> {
   const box = baselineBox(task)
-  return box ? { left: `${box.left}px`, width: `${box.width}px` } : {}
+  return box ? { left: `${box.left}%`, width: `${box.width}%` } : {}
+}
+
+function rangePercent(from: number, to: number): { left: number; width: number } {
+  const ticks = axis.value.ticks
+  const n = tickCount.value
+  const left = (ganttUnitIndex(from, ticks) / n) * 100
+  const right = (ganttUnitIndex(to, ticks) / n) * 100
+  const minWidth = (ganttUnitIndex(from + 0.35, ticks) / n) * 100 - left
+  return { left, width: Math.max(minWidth, right - left) }
+}
+
+function axisX(day: number): number {
+  return (ganttUnitIndex(day, axis.value.ticks) / tickCount.value) * naturalWidth.value
 }
 
 function barBox(task: GanttTask): { left: number; width: number } | null {
   const item = shown(task)
-  const start = dayNumber(item.start)
-  const end = dayNumber(item.end)
-  if (start == null || end == null) return null
-  const from = Math.min(start, end)
-  const to = Math.max(start, end)
-  return { left: (from - span.value.min) * px.value, width: Math.max(px.value * 0.35, (to - from + 1) * px.value) }
+  const range = ganttRange(item.start, item.end)
+  return range ? rangePercent(range.from, range.to) : null
 }
 
 function baselineBox(task: GanttTask): { left: number; width: number } | null {
   if (!task.baselineStart || !task.baselineEnd) return null
-  const start = dayNumber(task.baselineStart)
-  const end = dayNumber(task.baselineEnd)
-  if (start == null || end == null) return null
-  const from = Math.min(start, end)
-  const to = Math.max(start, end)
-  return { left: (from - span.value.min) * px.value, width: Math.max(4, (to - from + 1) * px.value) }
+  const range = ganttRange(task.baselineStart, task.baselineEnd)
+  return range ? rangePercent(range.from, range.to) : null
+}
+
+function columnStyle(index: number): Record<string, string> {
+  const band = dayBandPercent(index, tickCount.value)
+  return { left: `${band.left}%`, width: `${band.width}%` }
 }
 
 function arrowPath(x1: number, y1: number, x2: number, y2: number): string {
@@ -147,16 +283,16 @@ const arrows = computed(() => {
       const pred = tasks.value.find((item) => item.id === link.taskId)
       if (fromIndex == null || !pred) return []
       const predShown = shown(pred)
-      const predStart = dayNumber(predShown.start)
-      const predEnd = dayNumber(predShown.end)
-      const succStart = dayNumber(task.start)
-      const succEnd = dayNumber(task.end)
-      if (predStart == null || predEnd == null || succStart == null || succEnd == null) return []
+      const predRange = ganttRange(predShown.start, predShown.end)
+      const succRange = ganttRange(task.start, task.end)
+      if (!predRange || !succRange) return []
       const type = link.type || 'FS'
-      const fromX = type === 'SS' || type === 'SF' ? (predStart - span.value.min) * px.value : (predEnd - span.value.min + 1) * px.value
-      const toX = type === 'FF' || type === 'SF' ? (succEnd - span.value.min + 1) * px.value : (succStart - span.value.min) * px.value
-      const fromY = fromIndex * ROW + ROW / 2
-      const toY = toIndex * ROW + ROW / 2
+      const fromX = type === 'SS' || type === 'SF' ? axisX(predRange.from) : axisX(predRange.to)
+      const toX = type === 'FF' || type === 'SF' ? axisX(succRange.to) : axisX(succRange.from)
+      const fromBox = rowBox(fromIndex)
+      const toBox = rowBox(toIndex)
+      const fromY = fromBox.top + fromBox.height / 2
+      const toY = toBox.top + toBox.height / 2
       return [{
         key: `${pred.id}-${task.id}-${type}-${link.lag || 0}`,
         critical: isCritical(pred.id) && isCritical(task.id),
@@ -292,10 +428,35 @@ function setBaseline() {
   status.value = id ? '已设置选中任务的比较基准' : '已设置全部任务的比较基准'
 }
 
-function setScale(scale: 'day' | 'week' | 'month') {
+function setScale(scale: 'hour' | 'day' | 'week' | 'month' | 'year') {
   documentStore.mutateCanvas((doc) => {
     if (!isProjectGanttDoc(doc)) return
     doc.scale = scale
+  })
+}
+
+function pickProject() {
+  projectFileRef.value?.click()
+}
+
+function onProjectFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  void file.text().then((raw) => {
+    const parsed = parseMicrosoftProjectXml(raw)
+    if ('error' in parsed) {
+      status.value = parsed.error
+      return
+    }
+    documentStore.mutateCanvas((doc) => {
+      if (!isProjectGanttDoc(doc)) return
+      doc.title = parsed.title
+      doc.tasks = parsed.tasks
+    })
+    selectedId.value = parsed.tasks[0]?.id ?? null
+    status.value = `已导入 ${parsed.tasks.length} 条任务`
   })
 }
 
@@ -304,6 +465,16 @@ function setTitle(value: string) {
     if (!isProjectGanttDoc(doc)) return
     doc.title = value
   })
+}
+
+function setWhen(id: string, key: 'start' | 'end', raw: string, input: HTMLInputElement) {
+  const next = normalizeGanttDateTime(raw)
+  const task = tasks.value.find((item) => item.id === id)
+  if (!next) {
+    if (task) input.value = formatGanttDateTime(task[key])
+    return
+  }
+  patchTask(id, { [key]: next })
 }
 
 function setDuration(task: GanttTask, raw: string) {
@@ -369,17 +540,21 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
   event.stopPropagation()
   selectedId.value = task.id
   const originX = event.clientX
+  const body = chartRef.value?.querySelector('.chart-body') as HTMLElement | null
+  const bodyWidth = body?.getBoundingClientRect().width || 0
+  const dayPx = (bodyWidth > 0 ? bodyWidth : naturalWidth.value) / daySpan.value
   const ids = mode === 'move' ? [task.id, ...descendantIds(task.id)] : [task.id]
   const snapshot = tasks.value.filter((item) => ids.includes(item.id)).map((item) => ({ id: item.id, start: item.start, end: item.end }))
   const move = (ev: PointerEvent) => {
-    const delta = Math.round((ev.clientX - originX) / px.value)
+    const delta = Math.round((ev.clientX - originX) / dayPx)
     const next: Record<string, { start: string; end: string }> = {}
     for (const item of snapshot) {
       if (mode === 'resize') {
         const startDay = dayNumber(item.start) ?? 0
-        let endDay = (dayNumber(item.end) ?? startDay) + delta
+        const originEnd = dayNumber(item.end) ?? startDay
+        let endDay = originEnd + delta
         if (endDay < startDay) endDay = startDay
-        next[item.id] = { start: item.start, end: isoFromDay(endDay) }
+        next[item.id] = { start: item.start, end: shiftIso(item.end, endDay - originEnd) }
       } else {
         next[item.id] = { start: shiftIso(item.start, delta), end: shiftIso(item.end, delta) }
       }
@@ -404,30 +579,147 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 </script>
 
 <template>
-  <div class="gantt" :style="chrome" aria-label="项目甘特图">
+  <div class="gantt" :style="frame" aria-label="项目甘特图">
     <header class="gantt-head">
       <input class="title" :value="doc.title" aria-label="甘特图标题" @change="setTitle(($event.target as HTMLInputElement).value)" />
       <div class="toolbar">
-        <button type="button" @click="insert('task')">插入任务</button>
-        <button type="button" @click="insert('milestone')">插入里程碑</button>
-        <button type="button" :disabled="selectedIndex < 0" @click="toggleMilestone">设为里程碑</button>
-        <button type="button" :disabled="selectedIndex <= 0" @click="indent">降级</button>
-        <button type="button" :disabled="selectedIndex < 0 || !tasks[selectedIndex]?.parentId" @click="outdent">升级</button>
-        <button type="button" :disabled="selectedIndex <= 0" @click="linkPrevious">链接任务</button>
-        <button type="button" :disabled="selectedIndex < 0" @click="unlink">取消链接</button>
-        <button type="button" @click="schedule">按依赖排程</button>
-        <button type="button" @click="setBaseline">设置比较基准</button>
-        <button type="button" :disabled="!selectedId || tasks.length <= 1" @click="removeSelected">删除</button>
-        <span class="zoom" role="group" aria-label="时间刻度">
-          <button type="button" :aria-pressed="doc.scale === 'day'" @click="setScale('day')">日</button>
-          <button type="button" :aria-pressed="!doc.scale || doc.scale === 'week'" @click="setScale('week')">周</button>
-          <button type="button" :aria-pressed="doc.scale === 'month'" @click="setScale('month')">月</button>
+        <div class="mm-bar__group">
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="导入 Project"
+            aria-label="导入 Project"
+            @click="pickProject"
+          >
+            <el-icon><Upload /></el-icon>
+          </button>
+          <input
+            ref="projectFileRef"
+            class="file"
+            type="file"
+            accept=".xml,text/xml,application/xml"
+            aria-label="导入 Project 文件"
+            @change="onProjectFile"
+          />
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="插入任务"
+            aria-label="插入任务"
+            @click="insert('task')"
+          >
+            <el-icon><Tickets /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="插入里程碑"
+            aria-label="插入里程碑"
+            @click="insert('milestone')"
+          >
+            <el-icon><Flag /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex < 0"
+            title="设为里程碑"
+            aria-label="设为里程碑"
+            @click="toggleMilestone"
+          >
+            <el-icon><Position /></el-icon>
+          </button>
+        </div>
+        <div class="mm-bar__group">
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex <= 0"
+            title="降级"
+            aria-label="降级"
+            @click="indent"
+          >
+            <el-icon><Right /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex < 0 || !tasks[selectedIndex]?.parentId"
+            title="升级"
+            aria-label="升级"
+            @click="outdent"
+          >
+            <el-icon><Back /></el-icon>
+          </button>
+        </div>
+        <div class="mm-bar__group">
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex <= 0"
+            title="链接任务"
+            aria-label="链接任务"
+            @click="linkPrevious"
+          >
+            <el-icon><Connection /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex < 0"
+            title="取消链接"
+            aria-label="取消链接"
+            @click="unlink"
+          >
+            <el-icon><Remove /></el-icon>
+          </button>
+        </div>
+        <div class="mm-bar__group">
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="按依赖排程"
+            aria-label="按依赖排程"
+            @click="schedule"
+          >
+            <el-icon><Sort /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="设置比较基准"
+            aria-label="设置比较基准"
+            @click="setBaseline"
+          >
+            <el-icon><Flag /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="!selectedId || tasks.length <= 1"
+            title="删除"
+            aria-label="删除"
+            @click="removeSelected"
+          >
+            <el-icon><Delete /></el-icon>
+          </button>
+        </div>
+        <span class="zoom mm-bar__group" role="group" aria-label="时间刻度">
+          <button
+            v-for="item in GANTT_SCALES"
+            :key="item.id"
+            type="button"
+            class="mm-bar__btn"
+            :class="{ 'is-on': (doc.scale || 'week') === item.id }"
+            :aria-pressed="(doc.scale || 'week') === item.id"
+            @click="setScale(item.id)"
+          >{{ item.label }}</button>
         </span>
       </div>
     </header>
     <p v-if="status" class="status" role="status">{{ status }}</p>
-    <div class="split">
-      <div ref="gridRef" class="grid" @scroll="onGridScroll">
+    <div ref="splitRef" class="split">
+      <div ref="gridRef" class="grid" :style="gridPaneStyle" @scroll="onGridScroll">
         <table>
           <thead>
             <tr>
@@ -435,7 +727,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
               <th>WBS</th>
               <th>任务名称</th>
               <th>工期</th>
-              <th>开始</th>
+              <th>开工</th>
               <th>完成</th>
               <th>前置任务</th>
               <th>后置任务</th>
@@ -452,8 +744,8 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
               :data-critical="isCritical(row.task.id) ? '1' : '0'"
               @click="select(row.task.id)"
             >
-              <td class="id">{{ row.index + 1 }}</td>
-              <td class="wbs">{{ row.wbs }}</td>
+              <td class="id" data-label="ID">{{ row.index + 1 }}</td>
+              <td class="wbs" data-label="WBS">{{ row.wbs }}</td>
               <td class="name">
                 <span class="indent" :style="{ width: row.level * 14 + 'px' }" />
                 <button
@@ -466,7 +758,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                 <span v-else class="twist twist--blank" />
                 <input :value="row.task.name" aria-label="任务名称" @click.stop @change="patchTask(row.task.id, { name: ($event.target as HTMLInputElement).value })" />
               </td>
-              <td>
+              <td class="dur" data-label="工期">
                 <input
                   type="number"
                   min="0"
@@ -477,9 +769,49 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   @change="setDuration(row.task, ($event.target as HTMLInputElement).value)"
                 />
               </td>
-              <td><input type="date" :value="shown(row.task).start" aria-label="开始日期" @click.stop @change="patchTask(row.task.id, { start: ($event.target as HTMLInputElement).value })" /></td>
-              <td><input type="date" :value="shown(row.task).end" aria-label="结束日期" @click.stop @change="patchTask(row.task.id, { end: ($event.target as HTMLInputElement).value })" /></td>
-              <td>
+              <td class="start" data-label="开工">
+                <span class="when">
+                  <input
+                    class="when-text"
+                    :value="formatGanttDateTime(shown(row.task).start)"
+                    aria-label="开工时间"
+                    placeholder="yyyy-MM-dd HH:mm"
+                    @click.stop
+                    @change="setWhen(row.task.id, 'start', ($event.target as HTMLInputElement).value, $event.target as HTMLInputElement)"
+                  />
+                  <input
+                    class="when-picker"
+                    type="datetime-local"
+                    step="60"
+                    aria-label="选择开工时间"
+                    :value="ganttDateTimeLocal(shown(row.task).start)"
+                    @click.stop
+                    @change="setWhen(row.task.id, 'start', ($event.target as HTMLInputElement).value, $event.target as HTMLInputElement)"
+                  />
+                </span>
+              </td>
+              <td class="end" data-label="完成">
+                <span class="when">
+                  <input
+                    class="when-text"
+                    :value="formatGanttDateTime(shown(row.task).end)"
+                    aria-label="完成时间"
+                    placeholder="yyyy-MM-dd HH:mm"
+                    @click.stop
+                    @change="setWhen(row.task.id, 'end', ($event.target as HTMLInputElement).value, $event.target as HTMLInputElement)"
+                  />
+                  <input
+                    class="when-picker"
+                    type="datetime-local"
+                    step="60"
+                    aria-label="选择完成时间"
+                    :value="ganttDateTimeLocal(shown(row.task).end)"
+                    @click.stop
+                    @change="setWhen(row.task.id, 'end', ($event.target as HTMLInputElement).value, $event.target as HTMLInputElement)"
+                  />
+                </span>
+              </td>
+              <td class="pred" data-label="前置任务">
                 <input
                   :value="formatPredecessors(tasks, row.task)"
                   aria-label="前置任务"
@@ -488,9 +820,9 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   @change="setPred(row.task, ($event.target as HTMLInputElement).value)"
                 />
               </td>
-              <td class="succ" :aria-label="`后置任务 ${formatSuccessors(tasks, row.task)}`">{{ formatSuccessors(tasks, row.task) || '·' }}</td>
-              <td><input :value="row.task.owner" aria-label="资源" @click.stop @change="patchTask(row.task.id, { owner: ($event.target as HTMLInputElement).value })" /></td>
-              <td>
+              <td class="succ" data-label="后置任务" :aria-label="`后置任务 ${formatSuccessors(tasks, row.task)}`">{{ formatSuccessors(tasks, row.task) || '·' }}</td>
+              <td class="owner" data-label="资源"><input :value="row.task.owner" aria-label="资源" @click.stop @change="patchTask(row.task.id, { owner: ($event.target as HTMLInputElement).value })" /></td>
+              <td class="progress" data-label="进度">
                 <input
                   type="number"
                   min="0"
@@ -502,35 +834,43 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   @change="patchTask(row.task.id, { progress: Math.max(0, Math.min(100, Number(($event.target as HTMLInputElement).value) || 0)) })"
                 />
               </td>
-              <td class="slack" :data-slack="slackOf(row.task.id)">{{ slackOf(row.task.id) }}</td>
+              <td class="slack" data-label="时差" :data-slack="slackOf(row.task.id)">{{ slackOf(row.task.id) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div ref="chartRef" class="chart" aria-label="甘特图时间刻度" @scroll="onChartScroll">
-        <div class="chart-head" :style="{ width: chartWidth + 'px', height: HEAD + 'px' }">
+      <div
+        class="split-bar"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调节任务表宽度"
+        tabindex="0"
+        @pointerdown="startSplit"
+        @keydown="onSplitKey"
+      />
+      <div ref="chartRef" class="chart" aria-label="甘特图时间刻度" :style="{ '--gantt-day': unit + 'px' }" @scroll="onChartScroll">
+        <div class="chart-head" title="在日期上滚动可切换时、天、周、月、年" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: headStride + 'px' }">
           <div class="months">
-            <span v-for="month in months" :key="month.label" :style="{ width: month.days * px + 'px' }">{{ month.label }}</span>
+            <span v-for="group in axis.groups" :key="group.key" :style="{ flexGrow: group.count, minWidth: group.count * unit + 'px' }">{{ group.label }}</span>
           </div>
           <div class="ticks">
             <span
-              v-for="day in days"
-              :key="day"
-              :class="{ weekend: isWeekend(day) }"
-              :style="{ width: px + 'px' }"
-            >{{ tickLabel(day) }}</span>
+              v-for="tick in axis.ticks"
+              :key="tick.key"
+              :class="{ weekend: tick.weekend }"
+            >{{ tick.label }}</span>
           </div>
         </div>
-        <div class="chart-body" :style="{ width: chartWidth + 'px', height: visibleRows.length * ROW + 'px' }">
+        <div class="chart-body" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: chartBodyHeight + 'px' }">
           <div
-            v-for="day in days"
-            :key="'col-' + day"
+            v-for="(tick, index) in axis.ticks"
+            :key="'col-' + tick.key"
             class="col"
-            :class="{ weekend: isWeekend(day) }"
-            :style="{ left: (day - span.min) * px + 'px', width: px + 'px' }"
+            :class="{ weekend: tick.weekend }"
+            :style="columnStyle(index)"
           />
-          <div v-if="todayLeft != null" class="today" :style="{ left: todayLeft + 'px' }" />
-          <svg class="links" :width="chartWidth" :height="visibleRows.length * ROW">
+          <div v-if="todayLeft != null" class="today" :style="{ left: todayLeft + '%' }" />
+          <svg class="links" width="100%" height="100%" :viewBox="`0 0 ${naturalWidth} ${chartBodyHeight}`" preserveAspectRatio="none">
             <defs>
               <marker id="gantt-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
                 <path d="M0,0 L8,4 L0,8 Z" fill="#5f6368" />
@@ -542,6 +882,8 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
             <path
               v-for="arrow in arrows"
               :key="arrow.key"
+              class="chart-flow-line"
+              :class="{ 'is-selected': arrow.critical }"
               :d="arrow.d"
               :stroke="arrow.critical ? '#d93025' : '#5f6368'"
               :marker-end="arrow.critical ? 'url(#gantt-arrow-critical)' : 'url(#gantt-arrow)'"
@@ -554,7 +896,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
             :key="row.task.id"
             class="chart-row"
             :class="{ selected: row.task.id === selectedId }"
-            :style="{ top: index * ROW + 'px', height: ROW + 'px' }"
+            :style="{ top: rowBox(index).top + 'px', height: rowBox(index).height + 'px' }"
             @click="select(row.task.id)"
           >
             <div v-if="baselineBox(row.task)" class="baseline" :style="baselineStyle(row.task)" />
@@ -585,58 +927,108 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 </template>
 
 <style scoped>
-.gantt { height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 12px 14px 14px; box-sizing: border-box; color: #202124; }
+.gantt { height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 12px 14px 14px; box-sizing: border-box; overflow: auto; color: #202124; }
 .gantt-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 8px; }
-.title { font-size: 18px; font-weight: 700; border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; min-width: 160px; background: transparent; }
+.title { font-size: 20px; font-weight: 700; border: 1px solid transparent; border-radius: 6px; padding: 4px 8px; min-width: 0; min-height: 40px; max-width: 100%; background: transparent; }
 .title:focus { border-color: #1a73e8; background: #fff; outline: none; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.toolbar button, .zoom button { border: 1px solid #dadce0; background: #fff; border-radius: 6px; padding: 3px 8px; font-size: 12px; color: #202124; }
-.toolbar button:disabled { color: #9aa0a6; }
+.file { display: none; }
 .zoom { display: inline-flex; }
-.zoom button { border-radius: 0; }
-.zoom button:first-child { border-radius: 6px 0 0 6px; }
-.zoom button:last-child { border-radius: 0 6px 6px 0; }
-.zoom button[aria-pressed='true'] { background: #e8f0fe; color: #174ea6; }
-.status { margin: 0 0 8px; font-size: 12px; color: #174ea6; }
+.status { margin: 0 0 8px; font-size: 15px; color: #174ea6; }
 .split { flex: 1; min-height: 0; display: flex; border: 1px solid #dadce0; border-radius: 10px; overflow: hidden; background: #fff; }
-.grid { width: min(720px, 54%); min-width: 320px; overflow: auto; border-right: 1px solid #dadce0; }
-.grid table { border-collapse: collapse; width: max-content; min-width: 100%; }
-.grid th, .grid td { height: 32px; box-sizing: border-box; padding: 0 4px; border-bottom: 1px solid #f1f3f4; font-size: 12px; text-align: left; }
-.grid thead th { height: 40px; position: sticky; top: 0; background: #f3f6f9; z-index: 1; font-size: 11px; }
+.grid { width: min(720px, 54%); min-width: 0; flex: none; overflow: auto; }
+.split-bar { flex: none; width: 9px; cursor: col-resize; touch-action: none; background: #fff linear-gradient(#dadce0, #dadce0) center / 1px 100% no-repeat; z-index: 4; }
+.split-bar:hover, .split-bar:focus-visible { background-image: linear-gradient(#1a73e8, #1a73e8); outline: none; }
+.grid table { border-collapse: collapse; border-spacing: 0; width: max-content; min-width: 100%; }
+.grid tbody tr { height: var(--gantt-row, 44px); }
+.grid th, .grid td { height: var(--gantt-row, 44px); box-sizing: border-box; padding: 0 6px; border-bottom: 1px solid #f1f3f4; font-size: 14px; line-height: 20px; text-align: left; vertical-align: middle; }
+.grid thead tr { height: 40px; }
+.grid thead th { height: 40px; position: sticky; top: 0; background: #f3f6f9; z-index: 1; font-size: 13px; line-height: 20px; }
 .grid tr.selected td { background: #e8f0fe; }
 .grid tr.critical .name input { color: #d93025; font-weight: 700; }
-.grid input { width: 100%; box-sizing: border-box; border: 1px solid transparent; background: transparent; border-radius: 4px; padding: 2px 3px; font: inherit; color: inherit; }
+.grid input { width: 100%; height: 28px; min-height: 0; box-sizing: border-box; border: 1px solid transparent; background: transparent; border-radius: 4px; padding: 2px 3px; font: inherit; line-height: 20px; color: inherit; }
 .grid input:focus { border-color: #1a73e8; background: #fff; outline: none; }
-.grid input[type='date'] { width: 118px; }
-.grid input[type='number'] { width: 52px; }
+.when { position: relative; display: inline-flex; align-items: center; }
+.when::after { content: ''; position: absolute; right: 6px; width: 12px; height: 12px; border: 1.5px solid #5f6368; border-radius: 2px; box-shadow: inset 0 3px 0 #5f6368; pointer-events: none; }
+.grid input.when-text { width: 168px; padding-right: 22px; }
+.when-picker { position: absolute; right: 2px; width: 28px; height: 28px; opacity: 0; cursor: pointer; z-index: 1; }
+.grid input[type='number'] { width: 64px; }
 .id, .wbs, .slack { color: #5f6368; text-align: right; width: 36px; }
 .name { min-width: 180px; }
 .name { display: flex; align-items: center; }
 .indent { flex: none; }
-.twist { flex: none; width: 16px; border: 0; background: transparent; padding: 0; cursor: pointer; color: #5f6368; }
+.twist { flex: none; width: 32px; height: 32px; border: 0; background: transparent; padding: 0; font-size: 16px; cursor: pointer; color: #5f6368; }
 .twist--blank { display: inline-block; }
-.chart { flex: 1; overflow: auto; position: relative; background: #fff; }
-.chart-head { position: sticky; top: 0; z-index: 2; background: #f3f6f9; border-bottom: 1px solid #e0e0e0; }
-.months, .ticks { display: flex; height: 20px; }
-.months span, .ticks span { flex: none; box-sizing: border-box; overflow: hidden; font-size: 10px; line-height: 20px; color: #5f6368; border-left: 1px solid #eceff1; padding-left: 2px; }
+.chart { flex: 1 1 auto; min-width: 0; overflow: auto; position: relative; background: #fff; }
+.chart-head { position: sticky; top: 0; z-index: 2; background: #f3f6f9; border-bottom: 1px solid #e0e0e0; box-sizing: border-box; }
+.months, .ticks { display: flex; width: 100%; height: 20px; }
+.months span, .ticks span { flex: 1 1 0; box-sizing: border-box; min-width: var(--gantt-day, 16px); overflow: hidden; font-size: 12px; line-height: 20px; color: #5f6368; border-left: 1px solid #eceff1; padding-left: 2px; }
 .ticks span.weekend { background: #eef1f4; }
-.chart-body { position: relative; }
+.chart-body { position: relative; box-sizing: border-box; }
 .col { position: absolute; top: 0; bottom: 0; box-sizing: border-box; }
 .col.weekend { background: #f6f8fa; }
 .today { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #e37400; z-index: 1; pointer-events: none; }
-.links { position: absolute; inset: 0; pointer-events: none; }
-.links path { fill: none; stroke-width: 1.25; }
+.links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.links path { fill: none; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 .chart-row { position: absolute; left: 0; right: 0; }
 .chart-row.selected { background: rgba(26, 115, 232, 0.06); }
-.bar { position: absolute; top: 9px; height: 12px; border-radius: 3px; background: #1a73e8; cursor: grab; z-index: 1; }
+.bar { position: absolute; top: 11px; height: 16px; border-radius: 4px; background: #1a73e8; cursor: grab; z-index: 1; }
 .bar.critical { background: #d93025; }
-.bar.summary { top: 11px; height: 8px; border-radius: 1px; background: #202124; }
-.bar.summary::before, .bar.summary::after { content: ''; position: absolute; top: 0; width: 2px; height: 12px; background: #202124; }
+.bar.summary { top: 13px; height: 10px; border-radius: 1px; background: #202124; }
+.bar.summary::before, .bar.summary::after { content: ''; position: absolute; top: 0; width: 2px; height: 14px; background: #202124; }
 .bar.summary::before { left: 0; }
 .bar.summary::after { right: 0; }
 .progress { display: block; height: 100%; background: rgba(0, 0, 0, 0.28); border-radius: inherit; pointer-events: none; }
-.handle { position: absolute; right: 0; top: 0; width: 7px; height: 100%; cursor: ew-resize; }
-.milestone { position: absolute; top: 8px; width: 14px; height: 14px; background: #1a73e8; transform: rotate(45deg); cursor: grab; z-index: 1; }
+.handle { position: absolute; right: 0; top: 0; width: 10px; height: 100%; cursor: ew-resize; }
+.milestone { position: absolute; top: 12px; width: 16px; height: 16px; background: #1a73e8; transform: rotate(45deg); cursor: grab; z-index: 1; }
 .milestone.critical { background: #d93025; }
-.baseline { position: absolute; top: 23px; height: 4px; background: #80868b; border-radius: 2px; z-index: 1; }
+.baseline { position: absolute; top: 31px; height: 4px; background: #80868b; border-radius: 2px; z-index: 1; }
+@media (max-width: 900px) {
+  .gantt .split.split { flex-direction: column; overflow: visible; }
+  .split-bar { display: none; }
+  .grid {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid #dadce0;
+  }
+  .chart { flex: 1 1 220px; width: 100%; height: auto; min-height: 220px; }
+  .grid table { width: 100%; }
+  .grid thead { display: none; }
+  .grid tbody tr {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 12px 12px;
+    border-bottom: 1px solid #eceff1;
+  }
+  .grid td {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: auto;
+    padding: 0;
+  }
+  .grid td::before {
+    content: attr(data-label);
+    font-size: 15px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: #3c4043;
+  }
+  .grid td.name { grid-column: 1 / -1; min-width: 0; }
+  .grid td.name::before { content: none; }
+  .grid td.id,
+  .grid td.wbs,
+  .grid td.succ,
+  .grid td.slack { display: none; }
+  .grid td .when { display: flex; width: 100%; }
+  .grid input,
+  .grid input.when-text,
+  .grid input[type='number'] { width: 100%; min-height: 40px; }
+}
 </style>

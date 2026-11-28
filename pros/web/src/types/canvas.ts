@@ -1629,6 +1629,127 @@ export interface BusinessFormulaDocumentJSON {
 }
 
 /* ------------------------------------------------------------------ *
+ * 业务公式ABC模型
+ * ------------------------------------------------------------------ */
+
+export type AbcModelBlockId = 'ambition' | 'basis' | 'connection'
+
+export interface AbcModelBlock {
+  id: AbcModelBlockId
+  title: string
+  hint: string
+  text: string
+  items: QuadrantItem[]
+}
+
+export interface AbcModelDocumentJSON {
+  id: string
+  type: 'abc_model'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AbcModelBlock[]
+  formula: string
+}
+
+/* ------------------------------------------------------------------ *
+ * 业务公式十大经典范式
+ * ------------------------------------------------------------------ */
+
+export interface BusinessFormulaPatternParam {
+  name: string
+  desc: string
+  unit: string
+  defaultValue: number
+}
+
+export interface BusinessFormulaPattern {
+  id: number
+  name: string
+  category: 'revenue' | 'competition' | 'operation'
+  badge: string
+  badgeText: string
+  desc: string
+  formula: string
+  params: BusinessFormulaPatternParam[]
+}
+
+export interface BusinessFormulaPatternsDocumentJSON {
+  id: string
+  type: 'business_formula_patterns'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  patterns: BusinessFormulaPattern[]
+  savedParams: Record<number, Record<string, number>>
+}
+
+/* ------------------------------------------------------------------ *
+ * 业务公式修炼爬山
+ * ------------------------------------------------------------------ */
+
+export interface CultivationLevel {
+  level: number
+  name: string
+  subtitle: string
+  color: string
+  stage: 'beginner' | 'intermediate' | 'advanced'
+  problem: string
+  problems: string[]
+  paths: string[]
+  description: string
+}
+
+export interface CultivationMountainDocumentJSON {
+  id: string
+  type: 'cultivation_mountain'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  levels: CultivationLevel[]
+  currentLevel: number
+  assessmentAnswers: number[]
+}
+
+/* ------------------------------------------------------------------ *
+ * 调用黑客五部曲
+ * ------------------------------------------------------------------ */
+
+export interface HackerFiveStep {
+  id: string
+  /** 第几步（1-5） */
+  index: number
+  /** 关键工作 */
+  work: string
+  /** 依次回答：这一步要回答的问题 */
+  question: string
+  /** 真正难点 */
+  difficulty: string
+  /** 「依次回答」内容块 id，指向 doc.blocks */
+  blockId: string
+  /** 旧版纯文本答案（已迁移到 blocks，仅为容错） */
+  answer?: string
+}
+
+/** 「依次回答」内容块，与 Y 模型 / 五步法共用 items 结构 */
+export interface HackerFiveStepBlock {
+  id: string
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface HackerFiveStepsDocumentJSON {
+  id: string
+  type: 'hacker_five_steps'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  steps: HackerFiveStep[]
+  /** 五个「依次回答」内容块，与 steps[i].blockId 一一对应 */
+  blocks: HackerFiveStepBlock[]
+}
+
+/* ------------------------------------------------------------------ *
  * 苦练基本功三环分析法
  * ------------------------------------------------------------------ */
 
@@ -1762,8 +1883,8 @@ export interface ProjectGanttDocumentJSON {
   schemaVersion: number
   theme: CanvasTheme
   title: string
-  /** 时间刻度。缺省按周。 */
-  scale?: 'day' | 'week' | 'month'
+  /** 时间刻度。缺省按周。时、天、周、月、年。 */
+  scale?: 'hour' | 'day' | 'week' | 'month' | 'year'
   tasks: GanttTask[]
 }
 
@@ -2288,6 +2409,229 @@ export interface PlayingToWinDocumentJSON {
   blocks: PlayingToWinBlock[]
 }
 
+export type TenCheckRowId =
+  | 'scene'
+  | 'who'
+  | 'frequency'
+  | 'duration'
+  | 'marginal'
+  | 'standard'
+  | 'cost'
+  | 'chain'
+  | 'input'
+  | 'accept'
+
+export interface TenCheckRow {
+  id: TenCheckRowId
+  name: string
+  /** 你要填什么：格子上的说明，不随正文改写 */
+  prompt: string
+  /** 它帮你判断：格子上的说明 */
+  judges: string
+  /** 不合格的信号：格子上的说明 */
+  fail: string
+  /** 「你要填什么」富文本 */
+  answer: string
+  /** 「它帮你判断」富文本；旧文档若把说明写成了 HTML，会迁到这里 */
+  judgeNote?: string
+  /** 「不合格的信号」富文本 */
+  failNote?: string
+  passed: boolean | null
+}
+
+export interface TenCheckDocumentJSON {
+  id: string
+  type: 'ten_check'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  rows: TenCheckRow[]
+}
+
+/** 选场景三高：高频 / 高价值 / 高边际成本 */
+export type SceneThreeHighAxisId = 'frequency' | 'value' | 'marginal'
+
+export interface SceneThreeHighScores {
+  frequency: number
+  value: number
+  marginal: number
+}
+
+export interface SceneThreeHighAxis {
+  id: SceneThreeHighAxisId
+  title: string
+  headline: string
+  body: string
+}
+
+export interface SceneThreeHighBusiness {
+  id: string
+  name: string
+  color: string
+  stroke: string
+  scores: SceneThreeHighScores
+  note: string
+}
+
+export interface SceneThreeHighDocumentJSON {
+  id: string
+  type: 'scene_three_high'
+  schemaVersion: number
+  theme: CanvasTheme
+  kicker: string
+  title: string
+  verdict: string
+  passScore: number
+  axes: SceneThreeHighAxis[]
+  businesses: SceneThreeHighBusiness[]
+}
+
+/** 业务别用 AI：四条边界，分值 0–100 */
+export type AiBoundaryAxisId = 'cause' | 'irreversible' | 'data' | 'compliance'
+
+export interface AiBoundaryScores {
+  cause: number
+  irreversible: number
+  data: number
+  compliance: number
+}
+
+export interface AiBoundaryAxis {
+  id: AiBoundaryAxisId
+  title: string
+  body: string
+}
+
+export interface AiBoundaryBusiness {
+  id: string
+  name: string
+  color: string
+  stroke: string
+  scores: AiBoundaryScores
+  note: string
+}
+
+export interface AiBoundaryDocumentJSON {
+  id: string
+  type: 'ai_boundary'
+  schemaVersion: number
+  theme: CanvasTheme
+  kicker: string
+  title: string
+  verdict: string
+  warnScore: number
+  axes: AiBoundaryAxis[]
+  businesses: AiBoundaryBusiness[]
+}
+
+export interface FdeRichBlock {
+  id: string
+  kind: 'rich'
+  title: string
+  hint?: string
+  html: string
+}
+
+export interface FdeCheckItem {
+  id: string
+  label: string
+  checked: boolean
+  note: string
+}
+
+export interface FdeChecksBlock {
+  id: string
+  kind: 'checks'
+  title: string
+  hint?: string
+  items: FdeCheckItem[]
+}
+
+export interface FdeScoreItem {
+  id: string
+  label: string
+  hint?: string
+  score: number
+  max: number
+  note: string
+}
+
+export interface FdeScoreBlock {
+  id: string
+  kind: 'score'
+  title: string
+  hint?: string
+  items: FdeScoreItem[]
+}
+
+export interface FdeTableBlock {
+  id: string
+  kind: 'table'
+  title: string
+  hint?: string
+  columns: { id: string; label: string }[]
+  rows: { id: string; cells: Record<string, string> }[]
+}
+
+export interface FdeCard {
+  id: string
+  title: string
+  summary: string
+  fit: string
+  risk: string
+  note: string
+  chosen: boolean
+}
+
+export interface FdeCardsBlock {
+  id: string
+  kind: 'cards'
+  title: string
+  hint?: string
+  cards: FdeCard[]
+}
+
+export interface FdeRoiScenario {
+  id: string
+  name: string
+  tasks: number
+  beforeMin: number
+  afterMin: number
+  wage: number
+  adoption: number
+  monthlyCost: number
+  upfront: number
+}
+
+export interface FdeRoiBlock {
+  id: string
+  kind: 'roi'
+  title: string
+  hint?: string
+  scenarios: FdeRoiScenario[]
+}
+
+export type FdeBlock =
+  | FdeRichBlock
+  | FdeChecksBlock
+  | FdeScoreBlock
+  | FdeTableBlock
+  | FdeCardsBlock
+  | FdeRoiBlock
+
+/** 同一套版式承载 FDE 指南里的一页纸画布。compute 只影响页眉汇总。 */
+export interface FdeSheetDocumentJSON {
+  id: string
+  type: 'fde_sheet'
+  schemaVersion: number
+  theme: CanvasTheme
+  kicker: string
+  title: string
+  lede: string
+  compute?: 'self' | 'roi'
+  blocks: FdeBlock[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2348,6 +2692,10 @@ export type CanvasDocumentJSON = (
   | PmSolutionTriangleDocumentJSON
   | GrowthAssumptionsDocumentJSON
   | BusinessFormulaDocumentJSON
+  | AbcModelDocumentJSON
+  | BusinessFormulaPatternsDocumentJSON
+  | CultivationMountainDocumentJSON
+  | HackerFiveStepsDocumentJSON
   | ThreeRingBasicsDocumentJSON
   | LeadershipTriangleDocumentJSON
   | ContextSixElementsDocumentJSON
@@ -2376,6 +2724,11 @@ export type CanvasDocumentJSON = (
   | GoldenCircleDocumentJSON
   | SoarDocumentJSON
   | PlayingToWinDocumentJSON
+  | HackerFiveStepsDocumentJSON
+  | TenCheckDocumentJSON
+  | SceneThreeHighDocumentJSON
+  | AiBoundaryDocumentJSON
+  | FdeSheetDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2591,9 +2944,9 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
     { id: 'theory_build', title: '自己建模型', placeholder: '在此填写自建模型…' },
     { id: 'facts_hypothesis', title: '提出新假设', placeholder: '在此填写新假设…' },
     { id: 'facts_analysis', title: '如何定性定量分析', placeholder: '在此填写定性定量方法…' },
-    { id: 'cognition_cause', title: '理解因：我的框架 (1-5条)', placeholder: '在此填写框架条目…' },
-    { id: 'cognition_effect', title: '理解果：我的目标 (TopN)', placeholder: '在此填写目标条目…' },
-    { id: 'tools', title: '∴ 配套的组织和管理工具：', placeholder: '在此填写配套组织与管理工具…' },
+    { id: 'cognition_cause', title: '理解因：我的框架（1-5条）', placeholder: '' },
+    { id: 'cognition_effect', title: '理解果：我的目标（TopN）', placeholder: '' },
+    { id: 'tools', title: '∴ 配套的组织和管理工具：', placeholder: '' },
   ]
   const present = new Set(blocks.map((b) => b.id))
   for (const req of requiredRteBlocks) {
@@ -2613,13 +2966,29 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
 
   // 温和对齐附图默认标题（仅当仍是旧默认时）
   for (const b of blocks) {
-    if (b.id === 'cognition_cause' && b.title === '理解因：基本可行框架 (2-5条)') {
-      b.title = '理解因：我的框架 (1-5条)'
+    if (
+      b.id === 'cognition_cause' &&
+      (b.title === '理解因' ||
+        b.title === '理解因：基本可行框架 (2-5条)' ||
+        b.title === '理解因：我的框架 (1-5条)')
+    ) {
+      b.title = '理解因：我的框架（1-5条）'
+    }
+    if (
+      b.id === 'cognition_effect' &&
+      (b.title === '理解果' ||
+        b.title === '理解果：我的目标 (TopN)' ||
+        b.title === '理解果：我的目标(TopN)')
+    ) {
+      b.title = '理解果：我的目标（TopN）'
     }
     if (b.id === 'scope' && b.title === '圈定问题范围') {
       b.title = '解决真正问题'
     }
-    if (b.id === 'tools' && (b.title === '配套的组织和管理工具' || !b.title)) {
+    if (
+      b.id === 'tools' &&
+      (b.title === '配套工具' || b.title === '配套的组织和管理工具' || !b.title)
+    ) {
       b.title = '∴ 配套的组织和管理工具：'
     }
   }
@@ -2906,6 +3275,34 @@ export function isBusinessFormulaDoc(
   return !!doc && doc.type === 'business_formula'
 }
 
+/** 业务公式ABC模型 */
+export function isAbcModelDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is AbcModelDocumentJSON {
+  return !!doc && doc.type === 'abc_model'
+}
+
+/** 业务公式十大经典范式 */
+export function isBusinessFormulaPatternsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is BusinessFormulaPatternsDocumentJSON {
+  return !!doc && doc.type === 'business_formula_patterns'
+}
+
+/** 业务公式修炼爬山 */
+export function isCultivationMountainDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is CultivationMountainDocumentJSON {
+  return !!doc && doc.type === 'cultivation_mountain'
+}
+
+/** 调用黑客五部曲 */
+export function isHackerFiveStepsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is HackerFiveStepsDocumentJSON {
+  return !!doc && doc.type === 'hacker_five_steps'
+}
+
 /** 苦练基本功三环分析法 */
 export function isThreeRingBasicsDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -3040,6 +3437,22 @@ export function isPlayingToWinDoc(doc: CanvasDocumentJSON | null | undefined): d
   return !!doc && doc.type === 'playing_to_win'
 }
 
+export function isTenCheckDoc(doc: CanvasDocumentJSON | null | undefined): doc is TenCheckDocumentJSON {
+  return !!doc && doc.type === 'ten_check'
+}
+
+export function isSceneThreeHighDoc(doc: CanvasDocumentJSON | null | undefined): doc is SceneThreeHighDocumentJSON {
+  return !!doc && doc.type === 'scene_three_high'
+}
+
+export function isAiBoundaryDoc(doc: CanvasDocumentJSON | null | undefined): doc is AiBoundaryDocumentJSON {
+  return !!doc && doc.type === 'ai_boundary'
+}
+
+export function isFdeSheetDoc(doc: CanvasDocumentJSON | null | undefined): doc is FdeSheetDocumentJSON {
+  return !!doc && doc.type === 'fde_sheet'
+}
+
 export function isBreakEvenDoc(doc: CanvasDocumentJSON | null | undefined): doc is BreakEvenDocumentJSON {
   return !!doc && doc.type === 'break_even'
 }
@@ -3106,7 +3519,8 @@ export function isBlockCanvasDoc(
     isVrioDoc(doc) ||
     isGoldenCircleDoc(doc) ||
     isSoarDoc(doc) ||
-    isPlayingToWinDoc(doc)
+    isPlayingToWinDoc(doc) ||
+    isHackerFiveStepsDoc(doc)
   )
 }
 

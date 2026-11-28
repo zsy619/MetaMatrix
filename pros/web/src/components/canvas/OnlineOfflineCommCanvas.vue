@@ -123,6 +123,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
               '--ooc-accent': cellPaint(id).accent,
             }"
           >
+            <h2 class="ooc-title">{{ block(id)!.title }}</h2>
             <div class="ooc-body">
               <YModelBlockCard :block="block(id)!" hide-title />
             </div>
@@ -138,7 +139,8 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 8px 10px 10px;
   display: flex;
@@ -151,12 +153,12 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
 
 .ooc-frame {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
   max-width: none;
   margin: 0;
-  min-height: 0;
-  height: 100%;
+  min-height: 100%;
+  height: auto;
   padding: 36px 64px 40px 72px;
   box-sizing: border-box;
   display: flex;
@@ -208,10 +210,11 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
 
 .ooc-plot {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-height: 520px;
+  height: auto;
+  display: flex;
 }
 
 .ooc-axes {
@@ -227,12 +230,13 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
 .ooc-grid {
   position: relative;
   z-index: 2;
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  height: auto;
+  min-height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: minmax(min-content, 1fr) minmax(min-content, 1fr);
   gap: clamp(16px, 2.2vh, 28px) clamp(16px, 2.2vw, 28px);
   box-sizing: border-box;
 }
@@ -244,38 +248,61 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
   align-items: stretch;
   justify-content: flex-start;
   min-width: 0;
-  min-height: 0;
-  height: 100%;
+  min-height: min-content;
+  height: auto;
   border-radius: 0;
   padding: clamp(10px, 1.6vh, 18px) clamp(8px, 1.2vw, 16px) 8px;
   box-sizing: border-box;
   gap: 8px;
   border: none;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
 }
 
+.ooc-title {
+  display: none;
+  margin: 0;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--ooc-ink, #3c3424);
+}
+
 .ooc-body {
-  flex: 1;
-  min-height: 400px;
+  flex: 1 0 auto;
+  min-height: 120px;
   min-width: 0;
   display: flex;
   flex-direction: column;
   background: transparent;
   border-radius: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .ooc-body :deep(.ym-block) {
   position: relative;
-  flex: 1;
-  min-height: 0;
-  height: 100%;
+  flex: 1 0 auto;
+  min-height: min-content;
+  height: auto;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.ooc-body :deep(.ym-rte),
+.ooc-body :deep(.rte-root),
+.ooc-body :deep(.ym-block-body) {
+  flex: 1 0 auto;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
+}
+
+.ooc-body :deep(.rte-canvas) {
+  height: auto;
 }
 
 .ooc-body :deep(.ym-block-toolbar) {
@@ -293,9 +320,9 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
 }
 
 .ooc-body :deep(.ym-block-body) {
-  flex: 1;
-  min-height: 400px;
-  overflow: auto;
+  flex: 1 0 auto;
+  min-height: min-content;
+  overflow: visible;
 }
 
 .ooc-body :deep(.ym-block-body),
@@ -363,7 +390,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
   }
 
   .ooc-frame {
-    padding: 36px 10px 42px;
+    padding: 12px 10px 96px;
     min-height: 0;
     height: auto;
   }
@@ -384,9 +411,40 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
     display: none;
   }
 
-  .ooc-axis-label--left,
-  .ooc-axis-label--right {
+  .ooc-axis-label {
     display: none;
+  }
+
+  .ooc-title {
+    display: block;
+  }
+
+  .ooc-body :deep(.ym-block-toolbar),
+  .ooc-body :deep(.panel-attachments),
+  .ooc-body :deep(.pa-root) {
+    opacity: 1;
+  }
+
+  .ooc-body :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .ooc-body :deep(.rte-workspace),
+  .ooc-body :deep(.rte-canvas),
+  .ooc-body :deep(.ProseMirror) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .ooc-body :deep(.rte-canvas) {
+    padding-right: 44px;
+  }
+
+  .ooc-body :deep(.ProseMirror p) {
+    overflow-wrap: anywhere;
   }
 
   .ooc-cell {

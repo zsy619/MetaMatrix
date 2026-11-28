@@ -1,0 +1,18 @@
+{
+  "id": "canvas_abc_model",
+  "type": "abc_model",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "业务公式ABC模型",
+  "blocks": [
+    { "id": "ambition", "title": "A. 目标", "hint": "梳理业务 · 挑战目标 · 拆子目标", "text": "", "items": [] },
+    { "id": "basis", "title": "B. 参数", "hint": "关键财务指标 · 关键行为动作 · 关键运营节点 · 关键业务要素", "text": "", "items": [] },
+    { "id": "connection", "title": "C. 逻辑关系", "hint": "相关/因果关系 · 分支/关键路径 · 弱关系-强公式 · 数学关系+-×÷", "text": "", "items": [] }
+  ],
+  "formula": ""
+}

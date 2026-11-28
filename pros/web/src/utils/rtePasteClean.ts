@@ -1,4 +1,5 @@
 /** 飞书日常编辑：粘贴清洗与裸链接识别。保留标题、列表、强调和安全颜色。 */
+import { imageLinkHref } from './rteImageLayout'
 
 export const FEISHU_TEXT_COLORS = [
   '#1f2329',
@@ -109,6 +110,7 @@ const KEEP_TAGS = new Set([
   'br',
   'mark',
   'hr',
+  'figcaption',
 ])
 
 /** 把粘贴进来的属性值里的常见实体解开，再判断协议。 */
@@ -129,7 +131,8 @@ export function decodePasteAttr(raw: string): string {
 
 /** 链接只留 http(s) 和素材库 /media/{id}。图片还可留 data:image。 */
 export function safePasteUrl(raw: string, kind: 'a' | 'img'): string | null {
-  const value = decodePasteAttr(raw).trim()
+  const decoded = decodePasteAttr(raw).trim()
+  const value = decoded.startsWith('//') ? `https:${decoded}` : decoded
   if (!value || value.length > 2_000_000) return null
   if (/^\/media\/[0-9a-zA-Z-]+$/.test(value)) return value
   if (kind === 'img' && /^data:image\/(?:png|jpe?g|gif|webp);/i.test(value)) return value
@@ -215,6 +218,8 @@ function rebuildPasted(node: Node, doc: Document): Node | null {
     parent.setAttribute('src', src)
     const alt = (el.getAttribute('alt') || '').replace(/[<>"]/g, '').slice(0, 200)
     if (alt) parent.setAttribute('alt', alt)
+    const href = imageLinkHref(el.closest('a')?.getAttribute('href') || el.getAttribute('data-href') || '')
+    if (href) parent.setAttribute('data-href', href)
     return parent
   }
   if (parent && (tag === 'td' || tag === 'th')) {
@@ -292,6 +297,13 @@ export function sanitizePastedHtml(html: string): string {
     if (!bg) return all
     return `<${tag}${attrs} data-bg="${bg}">`
   })
+  out = out.replace(/<a\b([^>]*)>(\s*)<img\b([^>]*)>/gi, (all, aAttrs: string, space: string, imgAttrs: string) => {
+    if (/\bdata-href\s*=/i.test(imgAttrs)) return all
+    const quoted = /\bhref\s*=\s*(['"])([^'"]*)\1/i.exec(aAttrs)
+    const href = imageLinkHref(quoted?.[2] || '')
+    if (!href) return all
+    return `<a${aAttrs}>${space}<img${imgAttrs} data-href="${href}">`
+  })
   out = out
     .replace(/style\s*=\s*"[^"]*mso-[^"]*"/gi, '')
     .replace(/style\s*=\s*'[^']*mso-[^']*'/gi, '')
@@ -359,20 +371,66 @@ export function unwrapSinglePastedList(html: string): string {
   return only.innerHTML
 }
 
-/** 紧挨着图片的「图 1 说明」收进题注，避免和自动编号叠成两个图号。 */
+const FIGURE_CAPTION_RE = /^图\s*\d+(?:\s*-\s*\d+)?\s*[：:\-]?\s*(.*)$/
+
+function pastedCaptionRest(text: string): string | null {
+  const matched = text.trim().match(FIGURE_CAPTION_RE)
+  if (!matched) return null
+  return (matched[1] || '').trim()
+}
+
+/** 这一段里只有一张图（空格和换行不算），题注才会写在下一段。 */
+function imageOnlyHost(el: Element | null): Element | null {
+  if (!el || el.tagName === 'BODY' || el.querySelectorAll('img').length !== 1) return null
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      if ((child.textContent || '').trim()) return null
+      continue
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) return null
+    const tag = (child as Element).tagName
+    if (tag !== 'IMG' && tag !== 'BR') return null
+  }
+  return el
+}
+
+function captionBlock(el: Element | null): el is Element {
+  if (!el || el.querySelector('img')) return false
+  return el.tagName === 'P' || el.tagName === 'DIV' || el.tagName === 'FIGCAPTION'
+}
+
+function takePastedCaption(img: HTMLImageElement, text: string, remove: () => void, plain = false) {
+  const numbered = pastedCaptionRest(text)
+  if (numbered != null) {
+    if (numbered && !img.getAttribute('data-caption')) img.setAttribute('data-caption', numbered)
+    remove()
+    return true
+  }
+  if (!plain) return false
+  const caption = text.replace(/\s+/g, ' ').trim()
+  if (caption && !img.getAttribute('data-caption')) img.setAttribute('data-caption', caption)
+  remove()
+  return true
+}
+
+/** 紧挨着图片的「图 1 说明」收进题注，避免和自动编号叠成两个图号。图片单独成段、或题注来自 figcaption 时也收。 */
 export function absorbPastedFigureCaptions(html: string): string {
-  if (typeof DOMParser === 'undefined' || !/图\s*\d+/.test(html)) return html
+  if (typeof DOMParser === 'undefined' || (!/图\s*\d+/.test(html) && !/<figcaption\b/i.test(html))) return html
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const images = [...doc.body.querySelectorAll('img')]
   images.forEach((img) => {
-    const next = img.nextElementSibling
-    if (!next || next.tagName !== 'P') return
-    const text = (next.textContent || '').trim()
-    const matched = text.match(/^图\s*\d+\s*(.*)$/)
-    if (!matched) return
-    const caption = (matched[1] || '').trim()
-    if (caption) img.setAttribute('data-caption', caption)
-    next.remove()
+    const sibling = img.nextElementSibling
+    const plain = sibling?.tagName === 'FIGCAPTION'
+    if (captionBlock(sibling) && takePastedCaption(img, sibling.textContent || '', () => sibling.remove(), plain)) return
+    const prev = img.previousElementSibling
+    if (prev?.tagName === 'FIGCAPTION' && takePastedCaption(img, prev.textContent || '', () => prev.remove(), true)) return
+    const text = img.nextSibling
+    if (text && text.nodeType === Node.TEXT_NODE && takePastedCaption(img, text.textContent || '', () => text.remove())) {
+      return
+    }
+    const host = imageOnlyHost(img.parentElement)
+    const next = host?.nextElementSibling
+    if (captionBlock(next ?? null)) takePastedCaption(img, next?.textContent || '', () => next?.remove())
   })
   return doc.body.innerHTML
 }

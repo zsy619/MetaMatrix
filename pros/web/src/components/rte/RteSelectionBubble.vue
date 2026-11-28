@@ -4,6 +4,7 @@ import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 import { BLOCK_MENU } from './rteBlockMenu'
+import { alignChoiceTitle, blockMenuTitle } from '../../utils/rteToolbarOptimize'
 import RteColorBoard from './RteColorBoard.vue'
 
 /**
@@ -240,6 +241,7 @@ function run(action: () => void) {
                 :aria-selected="rte.isBlockMenuActive(item.id)"
                 :aria-haspopup="item.children ? 'menu' : undefined"
                 :aria-expanded="item.children ? blockSubId === item.id : undefined"
+                :title="blockMenuTitle(item.id) || undefined"
                 @click.stop="item.children && item.action.type === 'submenu' ? (blockSubId = item.id) : run(() => rte.applyBlockMenu(item.id))"
               >
                 <span data-rte-own class="rte-bubble-mark">{{ item.mark }}</span>
@@ -262,6 +264,7 @@ function run(action: () => void) {
                   class="rte-bubble-panel-item"
                   :class="{ active: rte.isBlockMenuActive(child.id) }"
                   :aria-selected="rte.isBlockMenuActive(child.id)"
+                  :title="blockMenuTitle(child.id) || undefined"
                   @click.stop="run(() => rte.applyBlockMenu(child.id))"
                 >
                   <span data-rte-own class="rte-bubble-mark">{{ child.mark }}</span>
@@ -343,7 +346,8 @@ function run(action: () => void) {
             class="rte-font-size-entry"
             type="text"
             placeholder="小四 或 12"
-            aria-label="输入字号"
+            title="输入小四或 12，按 Enter 应用"
+            aria-label="输入字号，按 Enter 应用"
             @mousedown.stop
             @keydown.enter.prevent="run(() => rte.applyFontSize(($event.target as HTMLInputElement).value))"
           />
@@ -433,7 +437,7 @@ function run(action: () => void) {
         type="button"
         class="rte-bubble-btn"
         :class="{ active: rte.isActive('code') }"
-        title="行内代码"
+        title="用等宽字标出这一小段 (Ctrl/⌘+E)"
         aria-label="行内代码"
         :aria-pressed="rte.isActive('code')"
         @mousedown.prevent
@@ -451,7 +455,7 @@ function run(action: () => void) {
           type="button"
           class="rte-bubble-btn"
           :class="{ active: rte.bubbleSwatch === 'text' || !!rte.currentTextColor() }"
-          title="文字颜色"
+          title="设置选中文字的颜色"
           aria-label="文字颜色"
           :aria-expanded="rte.bubbleSwatch === 'text'"
           @click.stop="toggleSwatch('text')"
@@ -482,7 +486,7 @@ function run(action: () => void) {
           type="button"
           class="rte-bubble-btn"
           :class="{ active: rte.bubbleSwatch === 'highlight' || rte.isActive('highlight') }"
-          title="高亮颜色"
+          title="给选中文字加底色，再点一次可取消"
           aria-label="高亮颜色"
           :aria-pressed="rte.isActive('highlight')"
           :aria-expanded="rte.bubbleSwatch === 'highlight'"
@@ -507,7 +511,7 @@ function run(action: () => void) {
         data-rte-own
         type="button"
         class="rte-bubble-btn"
-        title="清除格式"
+        title="去掉选中文字的加粗、颜色等格式"
         aria-label="清除格式"
         @click="rte.clearFormat"
       >
@@ -563,6 +567,7 @@ function run(action: () => void) {
             role="menuitem"
             class="rte-bubble-panel-item"
             :class="{ active: rte.isActive({ textAlign: 'left' }) }"
+            :title="alignChoiceTitle('left')"
             @click.stop="run(() => rte.setAlign('left'))"
           >
             左对齐
@@ -573,6 +578,7 @@ function run(action: () => void) {
             role="menuitem"
             class="rte-bubble-panel-item"
             :class="{ active: rte.isActive({ textAlign: 'center' }) }"
+            :title="alignChoiceTitle('center')"
             @click.stop="run(() => rte.setAlign('center'))"
           >
             居中
@@ -583,6 +589,7 @@ function run(action: () => void) {
             role="menuitem"
             class="rte-bubble-panel-item"
             :class="{ active: rte.isActive({ textAlign: 'right' }) }"
+            :title="alignChoiceTitle('right')"
             @click.stop="run(() => rte.setAlign('right'))"
           >
             右对齐
@@ -593,6 +600,7 @@ function run(action: () => void) {
             role="menuitem"
             class="rte-bubble-panel-item"
             :class="{ active: rte.isActive({ textAlign: 'justify' }) }"
+            :title="alignChoiceTitle('justify')"
             @click.stop="run(() => rte.setAlign('justify'))"
           >
             两端对齐
@@ -608,7 +616,7 @@ function run(action: () => void) {
         type="button"
         class="rte-bubble-btn"
         :class="{ active: rte.isActive('bulletList') }"
-        title="无序列表"
+        title="用圆点列出各项"
         aria-label="无序列表"
         :aria-pressed="rte.isActive('bulletList')"
         @click="rte.toggleBulletList"
@@ -620,7 +628,7 @@ function run(action: () => void) {
         type="button"
         class="rte-bubble-btn"
         :class="{ active: rte.isActive('orderedList') }"
-        title="有序列表"
+        title="用数字列出各项"
         aria-label="有序列表"
         :aria-pressed="rte.isActive('orderedList')"
         @click="rte.toggleOrderedList"
@@ -632,7 +640,7 @@ function run(action: () => void) {
         type="button"
         class="rte-bubble-btn"
         :class="{ active: rte.isActive('taskList') }"
-        title="任务列表"
+        title="用可勾选的待办列出各项"
         aria-label="任务列表"
         :aria-pressed="rte.isActive('taskList')"
         @click="rte.toggleTaskList"
@@ -659,7 +667,7 @@ function run(action: () => void) {
         data-rte-own
         type="button"
         class="rte-bubble-btn"
-        title="评论"
+        title="给选中文字加一条评论"
         aria-label="评论"
         @click="rte.beginComment"
       >
@@ -736,7 +744,7 @@ function run(action: () => void) {
           data-rte-own
           type="button"
           class="rte-bubble-btn"
-          title="打开链接"
+          title="在新页面打开这个链接"
           aria-label="打开链接"
           @click="rte.openCurrentLink"
         >
@@ -746,7 +754,7 @@ function run(action: () => void) {
           data-rte-own
           type="button"
           class="rte-bubble-btn"
-          title="复制链接地址"
+          title="复制这个链接的地址"
           aria-label="复制链接地址"
           @click="rte.copyCurrentLinkUrl"
         >
@@ -756,7 +764,7 @@ function run(action: () => void) {
           data-rte-own
           type="button"
           class="rte-bubble-btn rte-bubble-btn-danger"
-          title="取消链接"
+          title="去掉链接，留下文字"
           aria-label="取消链接"
           @click="rte.unlinkSelection"
         >

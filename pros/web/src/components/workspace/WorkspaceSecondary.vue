@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import GuideThumb from '../guide/GuideThumb.vue'
+// 模板缩略图渲染器（~130KB 源码 + 画布模板）按需加载。
+const GuideThumb = defineAsyncComponent(() => import('../guide/GuideThumb.vue'))
 import {
   listDocuments,
   searchDocuments,
@@ -135,7 +136,12 @@ function freshTitle(id: TemplateId): string {
 async function quickCreate(id: TemplateId) {
   createError.value = ''
   if (!auth.isAuthenticated) {
-    router.push({ name: 'canvas', params: { templateId: id } })
+    // 画布需要登录，未登录时直接送登录页。redirect 带上目标，
+    // 登录后回到这个模板的画布。
+    router.push({
+      name: 'login',
+      query: { redirect: `/canvas/${id}` },
+    })
     return
   }
   if (creatingId.value) return
@@ -160,8 +166,9 @@ async function ensureLoaded() {
   loading.value = true
   try {
     const [rows, hits] = await Promise.all([
-      listDocuments({ limit: 40 }),
-      searchDocuments({ q: '待办', limit: 5 }).catch(() => [] as SearchHit[]),
+      // 工作台只看画布：知识库文档有自己的入口，混进来点开会跳错视图。
+      listDocuments({ limit: 40, excludeDoc: true }),
+      searchDocuments({ q: '待办', limit: 5, excludeDoc: true }).catch(() => [] as SearchHit[]),
     ])
     const list = Array.isArray(rows) ? rows : []
     list.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
@@ -199,7 +206,7 @@ async function runSearch() {
   searching.value = true
   searched.value = true
   try {
-    searchHits.value = await searchDocuments({ q, limit: 8 }, { signal: ctrl.signal })
+    searchHits.value = await searchDocuments({ q, limit: 8, excludeDoc: true }, { signal: ctrl.signal })
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') return
     searchErr.value = friendlyApiMessage(e, '搜索失败')

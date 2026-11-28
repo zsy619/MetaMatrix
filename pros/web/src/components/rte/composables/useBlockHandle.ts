@@ -5,14 +5,16 @@ import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { Fragment } from '@tiptap/pm/model'
 import { reorderIndexes } from '../../../utils/rteBatch3'
 import { moveHeadingAt } from '../../../utils/rteHeadingSection'
-import { blockHandleLeft, blockToolsWidth, proseContentLeft } from '../../../utils/rteGutter'
+import { blockHandleLeft, proseContentLeft } from '../../../utils/rteGutter'
+
+/** 指针离开「+」/面板后的宽限期：够跨过两者之间的空隙，又不至于赖着不走。 */
+const BLOCK_MENU_CLOSE_DELAY_MS = 200
 
 /** 块手柄、块菜单与块拖拽。模板绑定名与原先一致。 */
 export function useBlockHandle(deps: {
   editor: ShallowRef<Editor | undefined>
   viewMode: () => { value: string }
   rteRootEl: Ref<HTMLElement | null>
-  expanded: () => boolean
 }) {
 /** —— 块操作：全选当前块 / 复制块 / 上移下移 —— */
 function getTopLevelBlockRange(): { from: number; to: number; node: { type: { name: string }; nodeSize: number; copy: (c?: unknown) => unknown } } | null {
@@ -156,6 +158,10 @@ function blockGapAt(canvas: HTMLElement, clientY: number) {
 const blockMenuOpen = ref(false)
 const blockMenuIndex = ref(-1)
 const bubbleSwatch = ref<'text' | 'highlight' | null>(null)
+/** 面板是否被点击「钉住」；悬停打开的面板移开指针就关。 */
+const blockMenuPinned = ref(false)
+/** 指针从「+」挪到面板的宽限期，避免中途误关。 */
+let blockMenuCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * 手柄左边界（相对 canvas 左边界）。
@@ -168,8 +174,7 @@ function handleLeftFor(canvas: HTMLElement, blockRect: { left: number }): number
   const prose = canvas.querySelector('.ProseMirror') as HTMLElement | null
   // 正文内容左边界；找不到 ProseMirror 时退回块自身的左边界。
   const contentLeft = prose ? proseContentLeft(prose) : blockRect.left
-  const toolsWidth = blockToolsWidth(deps.expanded())
-  const left = blockHandleLeft(contentLeft, canvasRect.left, toolsWidth)
+  const left = blockHandleLeft(contentLeft, canvasRect.left)
   // 留白被外部样式挤掉时也不要跑到 canvas 之外，避免手柄被裁掉。
   return Math.max(0, Math.round(left))
 }
@@ -201,17 +206,68 @@ function onCanvasBlockHover(event: MouseEvent) {
 
 function hideBlockHandle() {
   if (blockDragFrom >= 0) return
+  cancelBlockMenuClose()
   blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
   blockMenuOpen.value = false
+  blockMenuPinned.value = false
+}
+
+/**
+ * 面板的开关只有两条路：悬停打开（移开即关）与点击钉住（再点一次才关）。
+ * 两者共用一个关闭计时，指针在「+」与面板之间移动时不误关。
+ */
+function cancelBlockMenuClose() {
+  if (blockMenuCloseTimer) {
+    clearTimeout(blockMenuCloseTimer)
+    blockMenuCloseTimer = null
+  }
+}
+
+/** 指针进入「+」：直接亮出块操作面板，不抢正文焦点。 */
+function onBlockAddEnter() {
+  cancelBlockMenuClose()
+  const index = blockHandle.value.index
+  if (index < 0) return
+  if (blockMenuOpen.value && blockMenuIndex.value === index) return
+  blockMenuIndex.value = index
+  blockMenuOpen.value = true
+  blockMenuPinned.value = false
+}
+
+/** 指针进入面板：只取消关闭计时。 */
+function onBlockPanelEnter() {
+  cancelBlockMenuClose()
+}
+
+/** 指针离开「+」或面板：延迟关闭；只是挪到另一个部件上时不关。 */
+function onBlockPanelLeave(event: MouseEvent) {
+  const next = event.relatedTarget as Element | null
+  if (next && typeof next.closest === 'function') {
+    if (next.closest('.rte-block-tools, .rte-block-menu')) return
+  }
+  cancelBlockMenuClose()
+  blockMenuCloseTimer = setTimeout(() => {
+    blockMenuCloseTimer = null
+    blockMenuOpen.value = false
+    blockMenuPinned.value = false
+  }, BLOCK_MENU_CLOSE_DELAY_MS)
 }
 
 function toggleBlockMenu() {
-  if (blockMenuOpen.value && blockMenuIndex.value === blockHandle.value.index) {
+  const index = blockHandle.value.index
+  // 点击「+」是钉住：钉住后再点一次才关闭；悬停打开的面板不因这次点击消失。
+  if (
+    blockMenuOpen.value &&
+    blockMenuPinned.value &&
+    blockMenuIndex.value === index
+  ) {
     blockMenuOpen.value = false
+    blockMenuPinned.value = false
     return
   }
-  blockMenuIndex.value = blockHandle.value.index
+  blockMenuIndex.value = index
   blockMenuOpen.value = blockMenuIndex.value >= 0
+  blockMenuPinned.value = blockMenuOpen.value
   if (blockMenuOpen.value) focusBlockMenuSoon()
 }
 
@@ -246,6 +302,7 @@ function openBlockMenuForSelection() {
   placeBlockToolsAtIndex(index)
   blockMenuIndex.value = index
   blockMenuOpen.value = true
+  blockMenuPinned.value = true
   focusBlockMenuSoon()
 }
 
@@ -256,6 +313,7 @@ function onBlockMenuKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault()
     blockMenuOpen.value = false
+    blockMenuPinned.value = false
     deps.editor.value?.commands.focus()
     return
   }
@@ -295,6 +353,7 @@ type BlockTurn =
   | 'bullet'
   | 'ordered'
   | 'task'
+  | 'code'
   | 'quote'
   | 'info'
   | 'warn'
@@ -314,6 +373,7 @@ function turnHoveredBlock(kind: BlockTurn) {
   else if (kind === 'bullet' && !ed.isActive('bulletList')) chain.toggleBulletList()
   else if (kind === 'ordered' && !ed.isActive('orderedList')) chain.toggleOrderedList()
   else if (kind === 'task' && !ed.isActive('taskList')) chain.toggleTaskList()
+  else if (kind === 'code' && !ed.isActive('codeBlock')) chain.toggleCodeBlock()
   else if (kind === 'quote' && !ed.isActive('blockquote')) chain.toggleBlockquote()
   else if (kind === 'info' || kind === 'warn' || kind === 'success' || kind === 'error') {
     chain.setCallout(kind)
@@ -353,29 +413,45 @@ function moveHoveredBlock(dir: -1 | 1) {
   blockMenuOpen.value = false
 }
 
-/** 在当前块下方插入空段，并写入「/」唤起飞书式斜杠菜单。 */
-function insertBelowHoveredBlock() {
+/**
+ * 在目标顶层块后创建段落并放置光标。
+ * 斜杠入口写入「/」，直接插入入口传空文本；两条路径共享同一个定位事务，
+ * 避免图片、表格等命令落到原段段首，或把斜杠触发符留在正文里。
+ */
+function insertParagraphBelowHoveredBlock(text = ''): boolean {
   const ed = deps.editor.value
   const index = blockMenuIndex.value
-  if (!ed || index < 0 || index >= ed.state.doc.childCount) return
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return false
   const paragraph = ed.schema.nodes.paragraph
-  if (!paragraph) return
+  if (!paragraph) return false
   let pos = 0
   ed.state.doc.forEach((_node, offset, i) => {
     if (i === index) pos = offset
   })
   const node = ed.state.doc.child(index)
   const at = pos + node.nodeSize
-  const block = paragraph.create(null, ed.schema.text('/'))
+  const block = paragraph.create(null, text ? ed.schema.text(text) : null)
   let tr = ed.state.tr.insert(at, block)
   const cursor = at + block.nodeSize - 1
   tr = tr.setSelection(TextSelection.near(tr.doc.resolve(cursor)))
   ed.view.dispatch(tr.scrollIntoView())
   ed.commands.focus()
   blockMenuOpen.value = false
+  return true
 }
 
-function onBlockGripClick() {
+/** 保留原「在下方插入」行为：新段落写入 / 并唤起斜杠菜单。 */
+function insertBelowHoveredBlock() {
+  insertParagraphBelowHoveredBlock('/')
+}
+
+/** 「+」面板直接插入前准备干净的新段落，不写斜杠触发符。 */
+function prepareInsertBelowHoveredBlock(): boolean {
+  return insertParagraphBelowHoveredBlock()
+}
+
+/** 「+」按钮点击：刚拖动完时不要再弹面板。 */
+function onBlockAddClick() {
   if (gripDragged || blockDragFrom >= 0) return
   toggleBlockMenu()
 }
@@ -383,6 +459,9 @@ function onBlockGripClick() {
 function onBlockDragStart(event: DragEvent) {
   gripDragged = true
   blockDragFrom = blockHandle.value.index
+  // 拖拽排序时收起面板，别让它跟着手柄留在原地。
+  blockMenuOpen.value = false
+  blockMenuPinned.value = false
   event.dataTransfer?.setData('application/x-rte-block', String(blockDragFrom))
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
 }
@@ -435,6 +514,9 @@ function onCanvasBlockDrop(event: DragEvent) {
     onCanvasBlockHover,
     hideBlockHandle,
     toggleBlockMenu,
+    onBlockAddEnter,
+    onBlockPanelEnter,
+    onBlockPanelLeave,
     placeBlockToolsAtIndex,
     focusBlockMenuSoon,
     openBlockMenuForSelection,
@@ -445,7 +527,8 @@ function onCanvasBlockDrop(event: DragEvent) {
     deleteHoveredBlock,
     moveHoveredBlock,
     insertBelowHoveredBlock,
-    onBlockGripClick,
+    prepareInsertBelowHoveredBlock,
+    onBlockAddClick,
     onBlockDragStart,
     onBlockDragEnd,
     onCanvasBlockDragOver,

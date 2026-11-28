@@ -7,10 +7,10 @@ import {
   type ToolbarGroupButtonConfig,
   type ToolbarGroupButtonsByPanelId,
 } from './rteToolbarGroupButtons'
-import { CHART_GROUPS } from './echarts/chartGroups'
+import { CHART_GROUP_IDS } from './echarts/chartGroupIds'
 
 /** 图表分组在工具栏里的按钮 key（与 CHART_GROUPS 一一对应）。 */
-export const CHART_TOOLBAR_KEYS: readonly string[] = CHART_GROUPS.map((group) => `chart:${group.id}`)
+export const CHART_TOOLBAR_KEYS: readonly string[] = CHART_GROUP_IDS.map((id) => `chart:${id}`)
 
 /** 旧版「图表」总入口的按钮 key：一个下拉里再分区，现在拆成 9 个分类下拉。 */
 export const LEGACY_CHART_ENTRY_KEY = 'echarts'
@@ -124,7 +124,8 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     keys: [
       'callout', 'hr', 'columns', 'toggleBlock', 'tabsBlock',
       'blockOps', 'insertDate',
-      'form', 'template', 'timeline', 'statusChip', 'progressBar',
+      'form', 'template', 'timeline', 'timelineAdd', 'timelineDelete',
+      'statusChip', 'progressBar',
       'mermaid', 'snippets', 'crossDoc',
     ],
   },
@@ -194,9 +195,10 @@ const GROUP_BY_ID = new Map(TOOLBAR_GROUPS.map((group) => [group.id, group]))
 export const COMPACT_PRIMARY_KEYS_BY_GROUP: Record<string, readonly string[]> = {
   edit: ['undo', 'redo', 'find'],
   review: ['deepOptimize'],
-  style: ['bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
-  paragraph: ['heading', 'list', 'quote', 'code', 'align'],
+  style: ['fontSize', 'bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
+  paragraph: ['heading', 'list', 'quote', 'code', 'align', 'indent'],
   insert: ['link', 'image'],
+  table: ['table'],
 }
 
 /**
@@ -257,15 +259,18 @@ for (const group of TOOLBAR_GROUPS) {
   }
 }
 
-/** 迁移组内配置时旧分组配置的处理顺序（先旧组、后新组）。 */
+/**
+ * 迁移组内配置时的读取顺序：旧分组优先，当前分组随后。
+ *
+ * 当前分组直接取完整默认顺序，不再维护容易漏项的手写清单；否则新增
+ * writing、frame 这类分组后，已保存的按钮显隐与顺序会在再次迁移时丢失。
+ * Set 同时去掉既出现在别名表、又属于当前方案的分组 id，保证只合并一次。
+ */
 const MIGRATION_SOURCE_ORDER: readonly string[] = [
-  ...Object.keys(LEGACY_GROUP_ALIASES),
-  'style',
-  'edit',
-  'file',
-  'picture',
-  'page',
-  'tidy',
+  ...new Set([
+    ...Object.keys(LEGACY_GROUP_ALIASES),
+    ...DEFAULT_TOOLBAR_GROUP_ORDER,
+  ]),
 ]
 
 export function normalizeToolbarGroupOrder(saved: unknown): string[] {

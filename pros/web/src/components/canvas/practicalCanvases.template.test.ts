@@ -30,6 +30,7 @@ import {
   isMoscowDoc,
   isGoldenCircleDoc,
   isPlayingToWinDoc,
+  isTenCheckDoc,
   isSoarDoc,
   isVrioDoc,
   isValueChainDoc,
@@ -190,6 +191,11 @@ describe('实用商业画布', () => {
     expect(isGoldenCircleDoc(circle) && circle.blocks.map((block) => block.id)).toEqual(['why', 'how', 'what'])
     expect(isSoarDoc(soar) && soar.blocks).toHaveLength(4)
     expect(isPlayingToWinDoc(playing) && playing.blocks.map((block) => block.id)).toEqual(['aspiration', 'where', 'how', 'capabilities', 'systems'])
+    const ten = cloneTemplate('ten-check')
+    expect(isTenCheckDoc(ten) && ten.rows).toHaveLength(10)
+    expect(isTenCheckDoc(ten) && ten.title).toBe('十格自检')
+    expect(isTenCheckDoc(ten) && ten.rows[0]?.name).toBe('场景')
+    expect(isTenCheckDoc(ten) && ten.rows[9]?.fail).toContain('看着差不多')
     const store = useDocumentStore()
     store.loadFromTemplate('vrio')
     const vrioView = mount(VrioCanvas, { props: { doc: store.current_data as never } })
@@ -221,6 +227,42 @@ describe('实用商业画布', () => {
     } as typeof source)
     const migrated = store.current_data
     expect(isGoldenCircleDoc(migrated) && migrated.blocks.find((block) => block.id === 'why')?.items.map((item) => item.text)).toEqual(['先写信念', '再写证据'])
+  })
+
+  it('通用商业画布不放在 FDE，FDE 画布仍留在 FDE', () => {
+    const restored: Record<string, string> = {
+      'project-gantt': 'org',
+      'raci-matrix': 'org',
+      'daily-kanban': 'org',
+      'business-model-canvas': 'growth',
+      'cash-flow': 'growth',
+      swot: 'industry',
+      'lean-canvas': 'growth',
+      'value-proposition': 'growth',
+      okr: 'org',
+      'stakeholder-map': 'org',
+      pdca: 'org',
+      'five-forces': 'industry',
+      'income-statement': 'growth',
+      'value-chain': 'industry',
+      'seven-s': 'org',
+      rice: 'method',
+      'break-even': 'growth',
+      'customer-journey': 'growth',
+      kano: 'growth',
+      moscow: 'method',
+      'impact-effort': 'method',
+      vrio: 'method',
+      'golden-circle': 'method',
+      soar: 'method',
+      'playing-to-win': 'method',
+    }
+    for (const [id, category] of Object.entries(restored)) {
+      expect(TEMPLATE_META[id as keyof typeof TEMPLATE_META].category).toBe(category)
+    }
+    expect(TEMPLATE_META['ten-check'].category).toBe('fde')
+    expect(TEMPLATE_META['scene-three-high'].category).toBe('fde')
+    expect(TEMPLATE_META['ai-boundary'].category).toBe('fde')
   })
 
   it('甘特图后置任务指向依赖它的行', () => {

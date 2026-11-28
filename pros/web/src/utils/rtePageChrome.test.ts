@@ -6,7 +6,15 @@ import {
   groupSlides,
   headerForPage,
   normalizePageChrome,
+  pageBreakGap,
+  pageIndexAt,
+  pagesWithBreaks,
   printPageSideCss,
+  printSheetCss,
+  segmentHeights,
+  shiftGutterSide,
+  splitPreviewPages,
+  unwrapPageBreaks,
   readPageChrome,
   writePageChrome,
 } from './rtePageChrome.ts'
@@ -95,14 +103,123 @@ assert.equal(formatPageNumber('n', 2, 5), '2')
 assert.equal(formatPageNumber('page-n', 2, 5), '第 2 页')
 assert.equal(formatPageNumber('page-n-of-m', 2, 5), '第 2 页 共 5 页')
 assert.equal(formatPageNumber('dash', 2, 5), '- 2 -')
+assert.equal(formatPageNumber('upper-roman', 4, 10), 'IV')
+assert.equal(formatPageNumber('alpha', 1, 10), 'a')
+assert.equal(formatPageNumber('alpha', 27, 30), 'aa')
+assert.equal(formatPageNumber('upper-alpha', 2, 10), 'B')
+assert.equal(formatPageNumber('cjk', 1, 30), '一')
+assert.equal(formatPageNumber('cjk', 11, 30), '十一')
+assert.equal(formatPageNumber('cjk', 21, 30), '二十一')
+assert.equal(formatPageNumber('pad', 3, 20), '03')
+assert.equal(formatPageNumber('pad', 12, 20), '12')
+assert.equal(formatPageNumber('slash', 2, 5), '2/5')
+assert.equal(formatPageNumber('cjk-formal', 1, 30), '壹')
+assert.equal(formatPageNumber('cjk-formal', 11, 30), '拾壹')
+assert.equal(formatPageNumber('cjk-formal', 21, 30), '贰拾壹')
+assert.equal(formatPageNumber('greek', 1, 10), 'α')
+assert.equal(formatPageNumber('greek', 2, 10), 'β')
+assert.equal(formatPageNumber('greek', 24, 30), 'ω')
+assert.equal(formatPageNumber('of', 2, 5), '2 of 5')
+assert.equal(formatPageNumber('p', 3, 9), 'p. 3')
+assert.equal(formatPageNumber('no', 3, 9), 'No. 3')
+assert.equal(formatPageNumber('pg', 4, 9), 'Page 4')
+assert.equal(formatPageNumber('bracket', 6, 9), '【6】')
+assert.equal(formatPageNumber('paren', 7, 9), '（7）')
+assert.equal(formatPageNumber('square', 8, 9), '[8]')
+assert.equal(formatPageNumber('hash', 9, 12), '#9')
+assert.equal(formatPageNumber('dot', 4, 12), '4.')
+assert.equal(formatPageNumber('angle', 5, 12), '〈5〉')
+assert.equal(formatPageNumber('corner', 6, 12), '「6」')
+assert.equal(formatPageNumber('dcorner', 7, 12), '『7』')
+assert.equal(formatPageNumber('shell', 8, 12), '〔8〕')
+assert.equal(formatPageNumber('lens', 9, 12), '〖9〗')
+assert.equal(formatPageNumber('book', 3, 12), '《3》')
+assert.equal(formatPageNumber('numero', 4, 12), '№ 4')
+assert.equal(formatPageNumber('section', 6, 12), '§ 6')
+assert.equal(formatPageNumber('pilcrow', 2, 12), '¶ 2')
+assert.equal(formatPageNumber('wave', 7, 12), '～7～')
+assert.equal(formatPageNumber('diamond', 5, 12), '◆ 5')
+assert.equal(formatPageNumber('star', 8, 12), '★ 8')
+assert.equal(formatPageNumber('ring', 3, 12), '○ 3')
+assert.equal(formatPageNumber('heart', 6, 12), '♥ 6')
+assert.equal(formatPageNumber('roman', 4, 10), 'iv')
+assert.equal(formatPageNumber('roman', 9, 10), 'ix')
 const sideChrome = normalizePageChrome({ header: '奇数', headerEven: '偶数', footer: '', pageNumber: 'none' })
+assert.deepEqual(shiftGutterSide({ top: 10, right: 12, bottom: 10, left: 20 }, 8, 1), {
+  top: 10,
+  right: 12,
+  bottom: 10,
+  left: 20,
+})
+assert.deepEqual(shiftGutterSide({ top: 10, right: 12, bottom: 10, left: 20 }, 8, 2), {
+  top: 10,
+  right: 20,
+  bottom: 10,
+  left: 12,
+})
+assert.equal(headerForPage(sideChrome, 0), '奇数')
 assert.equal(headerForPage(sideChrome, 1), '奇数')
 assert.equal(headerForPage(sideChrome, 2), '偶数')
+assert.deepEqual(
+  applyChromeReserve({ top: 0, bottom: 0 }, {
+    header: '',
+    headerEven: '偶数',
+    footer: '',
+    footerEven: '偶底',
+    pageNumber: 'none',
+    gutter: 0,
+  }),
+  { top: 10, bottom: 10 },
+)
+assert.match(printSheetCss('A4', { top: 20, right: 15, bottom: 20, left: 15 }, 8), /margin: 20mm 15mm 20mm 23mm/)
+assert.match(printSheetCss('A4', { top: 20, right: 15, bottom: 20, left: 15 }, 8), /@page :left \{ margin: 20mm 23mm 20mm 15mm/)
+assert.equal(printSheetCss('A4', { top: 20, right: 15, bottom: 20, left: 15 }, 0).includes(':left'), false)
 assert.match(printPageSideCss(sideChrome), /@page :left/)
 assert.match(printPageSideCss(sideChrome), /偶数/)
 assert.equal(printPageSideCss(normalizePageChrome({ header: '只有奇数', pageNumber: 'none' })), '')
+const numbered = normalizePageChrome({
+  header: '奇数',
+  headerEven: '偶数',
+  footer: '底',
+  footerEven: '偶底',
+  pageNumber: 'page-n-of-m',
+})
+const numberedCss = printPageSideCss(numbered)
+assert.match(numberedCss, /counter\(page\)/)
+assert.match(numberedCss, /counter\(pages\)/)
+assert.match(numberedCss, /@bottom-right/)
+assert.match(numberedCss, /偶底/)
 assert.equal(estimatePageCount(1000, 400), 3)
 assert.equal(estimatePageCount(0, 400), 1)
+assert.equal(estimatePageCount(400.4, 400), 1)
+assert.equal(estimatePageCount(401, 400), 2)
+assert.deepEqual(segmentHeights([200, 0, 5000], 1000), [200, 800])
+assert.deepEqual(segmentHeights([200, 200, 500], 1000), [200, 300, 500])
+assert.equal(pagesWithBreaks([1000], 400), 3)
+assert.equal(pagesWithBreaks([200, 800], 400), 3)
+assert.equal(pagesWithBreaks([0, 100], 400), 1)
+assert.equal(pageIndexAt([200, 800], 400, 0), 1)
+assert.equal(pageIndexAt([200, 800], 400, 200), 2)
+assert.equal(pageIndexAt([200, 800], 400, 600), 3)
+assert.equal(pageBreakGap(200, 28, 400), 172)
+assert.equal(pageBreakGap(0, 28, 400), 0)
+assert.equal(pageBreakGap(390, 28, 400), 0)
+assert.deepEqual(unwrapPageBreaks([200, 800], [200, 28], [172, 0], 1200), {
+  offsets: [200, 628],
+  heights: [28, 28],
+  content: 1028,
+})
+assert.deepEqual(
+  splitPreviewPages('<p>上</p><div data-page-break="true" class="rte-page-break"><span>分页符</span></div><p>下</p>'),
+  ['<p>上</p>', '<p>下</p>'],
+)
+assert.deepEqual(
+  splitPreviewPages('<p>甲</p><hr data-page-break="true"><hr data-page-break="true"><p>乙</p>'),
+  ['<p>甲</p>', '<p>乙</p>'],
+)
+assert.deepEqual(splitPreviewPages('<p>甲</p><hr data-page-break="true">'), ['<p>甲</p>'])
+assert.deepEqual(splitPreviewPages('<div data-page-break="true"></div><p>下</p>'), ['<p>下</p>'])
+assert.deepEqual(splitPreviewPages('<p>没有分页</p>'), ['<p>没有分页</p>'])
 
 const blocks = [
   { html: '<p>引</p>', text: '引', heading: false },

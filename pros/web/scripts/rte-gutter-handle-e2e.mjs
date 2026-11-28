@@ -2,7 +2,8 @@
  * 块手柄留白 e2e：A4 纸张 + 窄边距下悬停段落，断言：
  * 1. 手柄（含容器）右边界 <= 首字左边界（横向无重叠）；
  * 2. 点击首字左边缘光标落在 offset 0（手柄容器不拦截正文点击）；
- * 3. 块菜单可打开、拖拽排序仍可用。
+ * 3. 左侧只有一个「+」按钮，它打开的面板同时含插入与块操作，所有菜单项都有 SVG 图标；
+ * 4. 快捷转换、块后插入、复制块与拖拽排序均可用，直接插入不残留「/」。
  *
  * 用法：node scripts/rte-gutter-handle-e2e.mjs
  * 依赖：本地 vite dev（默认 http://127.0.0.1:5173）+ /rte-gutter-preview.html
@@ -34,6 +35,8 @@ const browser = await chromium.launch({
 const VIEWPORTS = [
   { width: 1440, height: 900 },
   { width: 1280, height: 800 },
+  // 窄视口用于验证插入面板受视口约束，且新增手柄仍不遮挡正文。
+  { width: 768, height: 900 },
 ]
 
 /** 悬停某个顶层块，返回手柄与首字的几何信息。 */
@@ -58,6 +61,33 @@ async function hoverBlock(page, blockIndex) {
       point: { x: rect.left + Math.min(30, Math.max(6, (charRect.left - rect.left) / 2)), y: rect.top + 6 },
     }
   }, blockIndex)
+}
+
+/** 重新测量并悬停目标块，避免插入/转换后沿用已经变化的几何位置。 */
+async function openHandleMenu(page, blockIndex) {
+  const info = await hoverBlock(page, blockIndex)
+  if (info.error) throw new Error(info.error)
+  await page.mouse.move(info.point.x, info.point.y)
+  await page.waitForTimeout(120)
+  await page.click('.rte-block-tools .rte-block-add')
+  // 面板已开时这次点击是「关闭」，再点一次才打开。
+  if ((await page.locator('.rte-block-menu').count()) === 0) {
+    await page.click('.rte-block-tools .rte-block-add')
+  }
+  await page.waitForSelector('.rte-block-menu', { timeout: 3000 })
+}
+
+/** 收集当前面板的图标覆盖情况；缺失图标的按钮会带着名称进入失败详情。 */
+async function inspectMenuIcons(page) {
+  return page.evaluate(() => {
+    const items = Array.from(document.querySelectorAll('.rte-block-menu [role="menuitem"]'))
+    return {
+      count: items.length,
+      missing: items
+        .filter((item) => !item.querySelector('.rte-menu-glyph svg'))
+        .map((item) => item.getAttribute('aria-label') || item.textContent?.trim() || '未命名'),
+    }
+  })
 }
 
 for (const viewport of VIEWPORTS) {
@@ -138,47 +168,166 @@ for (const viewport of VIEWPORTS) {
     JSON.stringify(sel),
   )
 
-  // 块菜单仍可打开
-  await page.mouse.move(info.point.x, info.point.y)
-  await page.waitForTimeout(120)
-  await page.click('.rte-block-tools button[aria-label="块操作"]')
-  await page.waitForSelector('.rte-block-menu', { timeout: 3000 }).catch(() => {})
-  const menuOpen = await page.evaluate(() => !!document.querySelector('.rte-block-menu'))
-  log(`[${tag}] 块菜单可打开`, menuOpen)
-  await page.keyboard.press('Escape')
-  await page.waitForTimeout(120)
+  // 悬停「+」应直接亮出面板：不必点击。指针移开后面板自动收起。
+  const addBox = await page.locator('.rte-block-tools .rte-block-add').boundingBox()
+  if (addBox) {
+    await page.mouse.move(addBox.x + addBox.width / 2, addBox.y + addBox.height / 2)
+    await page.waitForSelector('.rte-block-menu', { timeout: 2000 }).catch(() => {})
+    const openedByHover = (await page.locator('.rte-block-menu').count()) === 1
+    log(`[${tag}] 悬停「+」直接亮出块操作面板`, openedByHover, openedByHover ? '面板已展开' : '面板没出现')
+    await page.mouse.move(geom.charRect.left + 40, geom.charRect.top + 4)
+    await page.waitForTimeout(500)
+    const closedAfterLeave = (await page.locator('.rte-block-menu').count()) === 0
+    log(`[${tag}] 指针移开后面板自动收起`, closedAfterLeave, closedAfterLeave ? '已收起' : '仍开着')
+  } else {
+    log(`[${tag}] 悬停「+」直接亮出块操作面板`, false, '没找到「+」按钮')
+  }
 
-  // 截图：悬停态（重新悬停后截）
-  await page.mouse.move(info.point.x, info.point.y)
+  // 「+」打开块操作面板（插入 + 转换 + 块操作），并检查所有命令都有真实 SVG。
+  await openHandleMenu(page, 1)
+  const insertPanel = await page.evaluate(() => {
+    const menus = Array.from(document.querySelectorAll('.rte-block-menu'))
+    const rect = menus[0]?.getBoundingClientRect()
+    return {
+      count: menus.length,
+      handleButtons: document.querySelectorAll('.rte-block-tools button').length,
+      insideViewport: !!rect && rect.left >= 0 && rect.right <= window.innerWidth + 0.5,
+    }
+  })
+  log(
+    `${tag}] 「+」面板打开且不溢出视口`,
+    insertPanel.count === 1 && insertPanel.insideViewport,
+    JSON.stringify(insertPanel),
+  )
+  const insertIcons = await inspectMenuIcons(page)
+  log(
+    `[${tag}] 插入菜单每项都有 SVG 图标`,
+    insertIcons.count > 0 && insertIcons.missing.length === 0,
+    `${insertIcons.count} 项；缺失：${insertIcons.missing.join('、') || '无'}`,
+  )
+  log(
+    `${tag}] 左侧只留一个手柄按钮`,
+    insertPanel.handleButtons === 1,
+    insertPanel.handleButtons + ' 个按钮',
+  )
+  const panelKinds = await page.evaluate(() => {
+    const menu = document.querySelector('.rte-block-menu')
+    const text = menu?.textContent ?? ''
+    return {
+      hasInsert: !!menu?.querySelector('.rte-block-quick-grid'),
+      hasTurn: text.includes('转换为'),
+      hasOps: text.includes('块操作'),
+    }
+  })
+  log(
+    `${tag}] 同一个面板里既能插入也能管理块`,
+    panelKinds.hasInsert && panelKinds.hasTurn && panelKinds.hasOps,
+    JSON.stringify(panelKinds),
+  )
+  await page.screenshot({ path: path.join(outDir, `rte-block-insert-${tag}.png`) })
+
+
+  // 基础快捷区沿用原块转换能力：目标文字不变，当前段落转为二级标题。
+  const originalText = await page.evaluate(() =>
+    document.querySelectorAll('.ProseMirror > *')[1]?.textContent ?? '',
+  )
+  await openHandleMenu(page, 1)
+  await page.click('.rte-block-quick[data-command="h2"]')
+  await page.waitForTimeout(250)
+  const turned = await page.evaluate(() => {
+    const block = document.querySelectorAll('.ProseMirror > *')[1]
+    return {
+      tag: block?.tagName,
+      text: block?.textContent ?? '',
+      menuOpen: !!document.querySelector('.rte-block-menu'),
+    }
+  })
+  log(
+    `[${tag}] 基础快捷区可转换当前块`,
+    turned.tag === 'H2' && turned.text === originalText && !turned.menuOpen,
+    JSON.stringify(turned),
+  )
+
+  // 直接插入应在目标块（index 1）后生成 horizontalRule，且空段准备过程不遗留「/」。
+  await openHandleMenu(page, 1)
+  await page.click('.rte-block-menu-item[data-command="hr"]')
+  await page.waitForTimeout(300)
+  const inserted = await page.evaluate(() => {
+    const ed = window.__rte?.editor
+    const content = ed?.getJSON().content ?? []
+    return {
+      nextType: content[2]?.type,
+      hasSlash: ed?.getText().includes('/') ?? true,
+      menuOpen: !!document.querySelector('.rte-block-menu'),
+    }
+  })
+  log(
+    `[${tag}] 分割线插入目标块下方且无「/」残留`,
+    inserted.nextType === 'horizontalRule' && !inserted.hasSlash && !inserted.menuOpen,
+    JSON.stringify(inserted),
+  )
+
+  // 原块管理入口保持可用：复制目标块后，文档增加一个相同内容的块。
+  const beforeCopyCount = await page.evaluate(() => window.__rte?.editor?.state.doc.childCount ?? 0)
+  await openHandleMenu(page, 1)
+  await page.getByRole('menuitem', { name: '复制块', exact: true }).click()
+  await page.waitForTimeout(250)
+  const copied = await page.evaluate(() => {
+    const ed = window.__rte?.editor
+    const blocks = document.querySelectorAll('.ProseMirror > *')
+    return {
+      count: ed?.state.doc.childCount ?? 0,
+      type: ed?.getJSON().content?.[2]?.type,
+      text: blocks[2]?.textContent ?? '',
+    }
+  })
+  log(
+    `[${tag}] 原复制块功能仍可用`,
+    copied.count === beforeCopyCount + 1 && copied.type === 'heading' && copied.text === originalText,
+    JSON.stringify(copied),
+  )
+
+  // 拖拽在干净夹具上单独回归，避免前面新增的分割线/复制块改变目标位置。
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => window.__RTE_PREVIEW_READY__ === true, { timeout: 30000 })
+  await page.waitForSelector('.ProseMirror > p')
+  const dragInfo = await hoverBlock(page, 1)
+  if (dragInfo.error) throw new Error(dragInfo.error)
+  await page.mouse.move(dragInfo.point.x, dragInfo.point.y)
   await page.waitForTimeout(150)
   await page.screenshot({ path: path.join(outDir, `rte-gutter-handle-${tag}.png`) })
 
-  // 拖拽排序：把第 2 块拖到第 4 块之前
-  const before = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('.ProseMirror > *')).map((el) => (el.textContent ?? '').slice(0, 8)),
-  )
-  await page.evaluate(() => {
-    const tools = document.querySelector('.rte-block-tools [draggable="true"]')
-    const canvas = document.querySelector('.rte-canvas')
-    if (!tools || !canvas) return
-    const dt = new DataTransfer()
-    tools.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }))
-    const blocks = Array.from(document.querySelectorAll('.ProseMirror > *'))
-    const target = blocks[3]
-    const rect = target.getBoundingClientRect()
-    const y = rect.top + 2
-    canvas.dispatchEvent(
-      new DragEvent('dragover', { bubbles: true, cancelable: true, clientX: rect.left + 20, clientY: y, dataTransfer: dt }),
+  // 展开态把第 2 块拖到第 4 块之前；紧凑态按既有设计不展示拖拽手柄。
+  const hasDragHandle = await page.locator('.rte-block-tools [draggable="true"]').count() > 0
+  if (hasDragHandle) {
+    const before = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.ProseMirror > *')).map((el) => (el.textContent ?? '').slice(0, 8)),
     )
-    canvas.dispatchEvent(
-      new DragEvent('drop', { bubbles: true, cancelable: true, clientX: rect.left + 20, clientY: y, dataTransfer: dt }),
+    await page.evaluate(() => {
+      const tools = document.querySelector('.rte-block-tools [draggable="true"]')
+      const canvas = document.querySelector('.rte-canvas')
+      if (!tools || !canvas) return
+      const dt = new DataTransfer()
+      tools.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }))
+      const blocks = Array.from(document.querySelectorAll('.ProseMirror > *'))
+      const target = blocks[3]
+      const rect = target.getBoundingClientRect()
+      const y = rect.top + 2
+      canvas.dispatchEvent(
+        new DragEvent('dragover', { bubbles: true, cancelable: true, clientX: rect.left + 20, clientY: y, dataTransfer: dt }),
+      )
+      canvas.dispatchEvent(
+        new DragEvent('drop', { bubbles: true, cancelable: true, clientX: rect.left + 20, clientY: y, dataTransfer: dt }),
+      )
+    })
+    await page.waitForTimeout(300)
+    const after = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.ProseMirror > *')).map((el) => (el.textContent ?? '').slice(0, 8)),
     )
-  })
-  await page.waitForTimeout(300)
-  const after = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('.ProseMirror > *')).map((el) => (el.textContent ?? '').slice(0, 8)),
-  )
-  log(`[${tag}] 拖拽排序仍可用`, JSON.stringify(before) !== JSON.stringify(after), `${before.join('|')} → ${after.join('|')}`)
+    log(`[${tag}] 拖拽排序仍可用`, JSON.stringify(before) !== JSON.stringify(after), `${before.join('|')} → ${after.join('|')}`)
+  } else {
+    log(`[${tag}] 当前视口没有拖拽柄`, true, '左侧只有「+」一个入口')
+  }
 
   await context.close()
 }

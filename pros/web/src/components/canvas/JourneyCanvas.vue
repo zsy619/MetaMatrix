@@ -39,12 +39,16 @@ function block(id: JourneyBlockId) {
 </template>
 
 <style scoped>
-.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; background: var(--cv-page, #f7f7f7); color: #202124; }
+.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; overflow: auto; background: var(--cv-page, #f7f7f7); color: #202124; }
 .sheet-top { flex: none; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
-.sheet-top p { color: #5f6368; font-size: 13px; }
+.sheet-top p { max-width: 46em; color: #3c4043; font-size: 15px; line-height: 1.55; }
 .grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 section { display: flex; flex-direction: column; min-height: 0; height: 100%; background: var(--col-body); border-radius: 12px; overflow: hidden; }
-h3 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; letter-spacing: 0.06em; }
+h3 { margin: 0; min-height: 48px; display: flex; align-items: center; justify-content: center; padding: 8px 10px; background: var(--col-header); color: #fff; font-size: 16px; letter-spacing: 0.04em; text-align: center; }
 .rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
+@media (max-width: 1100px) {
+  .grid.grid { grid-template-columns: 1fr; }
+  section { min-height: 220px; height: auto; }
+}
 </style>

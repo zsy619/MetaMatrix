@@ -16,7 +16,8 @@ import {
   resizeCollageStack,
   normalizeGroupRatios,
   ratioPercents,
-  resizePair,
+  ratiosSkippingHidden,
+  resizeVisiblePair,
   rowLayout,
 } from '../utils/rteImageGroup'
 import {
@@ -50,8 +51,19 @@ function ensureImageGroupStyle() {
   installImageGroupLayout()
 }
 
-function imageAspect(frame: HTMLElement): number {
+function frameImage(frame: HTMLElement): HTMLImageElement | null {
+  if (frame instanceof HTMLImageElement) return frame
   const img = frame.querySelector('img')
+  return img instanceof HTMLImageElement ? img : null
+}
+
+function frameConcealed(frame: HTMLElement | undefined): boolean {
+  if (!frame) return false
+  return frameImage(frame)?.getAttribute('data-concealed') === '1'
+}
+
+function imageAspect(frame: HTMLElement): number {
+  const img = frameImage(frame)
   if (img instanceof HTMLImageElement && img.naturalWidth > 0 && img.naturalHeight > 0) {
     return img.naturalWidth / img.naturalHeight
   }
@@ -78,7 +90,21 @@ const COLLAGE_AREAS = {
 function imageFit(img: HTMLImageElement, groupFit: 'cover' | 'contain'): 'cover' | 'contain' {
   const own = img.getAttribute('data-fit')
   if (own === 'cover' || own === 'contain') return own
+  if (img.getAttribute('data-crop-aspect')) return 'cover'
+  const zoom = Number(img.getAttribute('data-crop-zoom'))
+  if (Number.isFinite(zoom) && zoom > 1) return 'cover'
   return groupFit
+}
+
+function paintCropFrame(img: HTMLImageElement, fit: 'cover' | 'contain') {
+  img.style.setProperty('object-fit', imageFit(img, fit), 'important')
+  const focusX = Number(img.getAttribute('data-crop-focus-x'))
+  const focusY = Number(img.getAttribute('data-crop-focus-y'))
+  if (img.hasAttribute('data-crop-aspect') && Number.isFinite(focusX) && Number.isFinite(focusY)) {
+    img.style.setProperty('object-position', `${Math.round(focusX * 100)}% ${Math.round(focusY * 100)}%`, 'important')
+  }
+  const zoom = Number(img.getAttribute('data-crop-zoom'))
+  if (Number.isFinite(zoom) && zoom > 1) img.style.setProperty('transform', `scale(${zoom})`, 'important')
 }
 
 function paintCollage(
@@ -119,7 +145,7 @@ function paintCollage(
     if (img instanceof HTMLImageElement) {
       img.style.setProperty('width', '100%', 'important')
       img.style.setProperty('height', '100%', 'important')
-      img.style.setProperty('object-fit', imageFit(img, fit), 'important')
+      paintCropFrame(img, fit)
       img.style.setProperty('max-width', 'none', 'important')
     }
   })
@@ -139,7 +165,7 @@ function paintMix(
   const frames = Array.from(row.children).filter(
     (child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('rte-image-caption-inline'),
   )
-  const concealed = (frame: HTMLElement | undefined) => frame?.querySelector('img')?.getAttribute('data-concealed') === '1'
+  const concealed = (frame: HTMLElement | undefined) => frameConcealed(frame)
   const stackVisible = !concealed(frames[stackAt]) && !concealed(frames[stackAt + 1])
   const visibleCount = frames.filter((frame) => !concealed(frame)).length
   const columns = Math.max(1, stackVisible ? visibleCount - 1 : visibleCount)
@@ -172,7 +198,7 @@ function paintMix(
       singleColumn += 1
     }
     const img = frame.querySelector('img')
-    if (img instanceof HTMLImageElement) img.style.setProperty('object-fit', imageFit(img, fit), 'important')
+    if (img instanceof HTMLImageElement) paintCropFrame(img, fit)
   })
 }
 
@@ -190,6 +216,8 @@ function paintRows(row: HTMLElement) {
     child.style.flex = 'none'
     child.style.width = '100%'
     child.style.height = 'auto'
+    const img = child.querySelector('img')
+    if (img instanceof HTMLImageElement) paintCropFrame(img, 'contain')
   })
 }
 
@@ -234,7 +262,7 @@ function paintGroupMetrics(dom: HTMLElement, row: HTMLElement, ratios: readonly 
     if (img instanceof HTMLImageElement) {
       img.style.setProperty('width', '100%', 'important')
       img.style.setProperty('height', '100%', 'important')
-      img.style.setProperty('object-fit', 'contain', 'important')
+      paintCropFrame(img, 'contain')
       img.style.setProperty('max-width', 'none', 'important')
     }
   })
@@ -336,20 +364,21 @@ export function layoutImageGroupChrome(view: EditorView) {
       (child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('ProseMirror-widget'),
     )
     kids.forEach((kid) => {
-      const hidden = kid.querySelector('img')?.getAttribute('data-concealed') === '1'
+      const hidden = frameConcealed(kid)
       kid.style.display = hidden ? 'none' : ''
     })
     const visible = kids.filter((kid) => kid.style.display !== 'none')
     const laidKids = visible.length ? visible : kids
-    const aspects = laidKids.map(imageAspect)
-    const ratios = visible.length && visible.length < kids.length
-      ? normalizeGroupRatios(laidKids.length, null)
-      : groupUsesAspect(node.attrs.ratioMode)
-        ? aspects
-        : normalizeGroupRatios(laidKids.length, node.attrs.ratios)
+    const hidden = kids.map((kid) => kid.style.display === 'none')
+    const aspects = kids.map(imageAspect)
+    const natural = groupUsesAspect(node.attrs.ratioMode)
+      ? aspects
+      : normalizeGroupRatios(kids.length, node.attrs.ratios)
+    const ratios = ratiosSkippingHidden(natural, hidden)
     const gap = normalizeGroupGap(node.attrs.gap)
     const layout = normalizeGroupLayout(node.attrs.layout)
-    const signature = `${layout}:${Math.round(row.clientWidth)}:${laidKids.length}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}:${node.attrs.stackSide || ''}:${node.attrs.stackSplit ?? ''}:${node.attrs.layoutBefore || ''}`
+    const hiddenMask = hidden.map((item) => (item ? '0' : '1')).join('')
+    const signature = `${layout}:${Math.round(row.clientWidth)}:${laidKids.length}:${hiddenMask}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}:${node.attrs.stackSide || ''}:${node.attrs.stackSplit ?? ''}:${node.attrs.layoutBefore || ''}`
     if (row.clientWidth > 8 && dom.dataset.rteSig === signature && dom.dataset.ratioDrag !== '1') return false
     dom.dataset.rteSig = signature
     if (layout === 'row') dom.removeAttribute('data-layout')
@@ -415,13 +444,17 @@ export function layoutImageGroupChrome(view: EditorView) {
     if (dom.dataset.ratioDrag === '1') return false
     dividers.replaceChildren()
     const domRect = dom.getBoundingClientRect()
-    for (let index = 0; index < kids.length - 1; index += 1) {
-      const left = kids[index]!.getBoundingClientRect()
-      const right = kids[index + 1]!.getBoundingClientRect()
+    const visibleIndex = kids.flatMap((kid, index) => (kid.style.display === 'none' ? [] : [index]))
+    for (let pair = 0; pair < visibleIndex.length - 1; pair += 1) {
+      const leftIndex = visibleIndex[pair]!
+      const rightIndex = visibleIndex[pair + 1]!
+      const left = kids[leftIndex]!.getBoundingClientRect()
+      const right = kids[rightIndex]!.getBoundingClientRect()
       const handle = document.createElement('button')
       handle.type = 'button'
       handle.className = 'rte-image-group-divider'
-      handle.dataset.index = String(index)
+      handle.dataset.index = String(leftIndex)
+      handle.dataset.right = String(rightIndex)
       handle.dataset.groupPos = String(pos)
       handle.setAttribute('aria-label', '调整图片宽度比例')
       handle.title = '拖动调整两侧宽度'
@@ -453,9 +486,10 @@ export function layoutImageGroupChrome(view: EditorView) {
         const pairWidth = right.right - left.left
         const current = view.state.doc.nodeAt(groupPos)
         const gap = normalizeGroupGap(current?.attrs.gap)
-        const base = groupUsesAspect(current?.attrs.ratioMode)
+        const natural = groupUsesAspect(current?.attrs.ratioMode)
           ? kids.map(imageAspect)
           : normalizeGroupRatios(kids.length, current?.attrs.ratios)
+        const hiddenNow = kids.map((kid) => kid.style.display === 'none')
         dom.dataset.ratioDrag = '1'
         handle.classList.add('is-active')
         const tip = document.createElement('div')
@@ -466,16 +500,17 @@ export function layoutImageGroupChrome(view: EditorView) {
         const move = (ev: PointerEvent) => {
           if (Math.abs(ev.clientX - originX) > 3) moved = true
           const share = pairWidth ? (ev.clientX - pairLeft) / pairWidth : 0.5
-          const next = resizePair(base, index, share)
-          dom.style.setProperty(`--g${index}`, String(next[index]))
-          dom.style.setProperty(`--g${index + 1}`, String(next[index + 1]))
-          paintGroupMetrics(dom, row, next, gap)
-          const percents = ratioPercents(next)
-          tip.textContent = next.map((_, i) => `${percents[i]}%`).join(' · ')
+          const next = resizeVisiblePair(natural, leftIndex, rightIndex, share)
+          const painted = ratiosSkippingHidden(next, hiddenNow)
+          dom.style.setProperty(`--g${leftIndex}`, String(next[leftIndex]))
+          dom.style.setProperty(`--g${rightIndex}`, String(next[rightIndex]))
+          paintGroupMetrics(dom, row, painted, gap)
+          const percents = ratioPercents(painted.filter((n) => n > 0))
+          tip.textContent = percents.map((percent) => `${percent}%`).join(' · ')
           tip.style.left = `${ev.clientX}px`
           tip.style.top = `${ev.clientY - 36}px`
-          const mid = kids[index]!.getBoundingClientRect().right
-          const nextLeft = kids[index + 1]!.getBoundingClientRect().left
+          const mid = kids[leftIndex]!.getBoundingClientRect().right
+          const nextLeft = kids[rightIndex]!.getBoundingClientRect().left
           handle.style.left = `${(mid + nextLeft) / 2 - dom.getBoundingClientRect().left}px`
         }
         const up = (ev: PointerEvent) => {
@@ -486,7 +521,7 @@ export function layoutImageGroupChrome(view: EditorView) {
           delete dom.dataset.ratioDrag
           if (!moved || ev.detail >= 2) return
           const share = pairWidth ? (ev.clientX - pairLeft) / pairWidth : 0.5
-          const next = resizePair(base, index, share)
+          const next = resizeVisiblePair(natural, leftIndex, rightIndex, share)
           const latest = groupPosFromDom(view, dom)
           const at = latest ?? groupPos
           if (view.state.doc.nodeAt(at)?.type.name === 'imageGroup') setGroupRatios(view, at, next)
@@ -650,7 +685,7 @@ export const ImageGroup = Node.create({
         return button
       }
 
-      const handle = addIconButton('rte-image-group-handle', '拖动图片组', 'M4 2h2v2H4zm6 0h2v2h-2zM4 7h2v2H4zm6 0h2v2h-2zM4 12h2v2H4zm6 0h2v2h-2z')
+      const handle = addIconButton('rte-image-group-handle', '按住拖动整组图片', 'M4 2h2v2H4zm6 0h2v2h-2zM4 7h2v2H4zm6 0h2v2h-2zM4 12h2v2H4zm6 0h2v2h-2z')
       handle.addEventListener('pointerdown', (event) => {
         const pos = getPos()
         if (typeof pos !== 'number' || event.button !== 0) return
@@ -671,8 +706,8 @@ export const ImageGroup = Node.create({
         right: 'M2 3h12v2H2zm4 4h8v2H6zm2 4h6v2H8z',
       } as const
       for (const align of ['left', 'center', 'right'] as const) {
-        const label = align === 'left' ? '居左' : align === 'center' ? '居中' : '居右'
-        const button = addIconButton('rte-image-group-align', `图片组${label}`, alignIcons[align])
+        const label = align === 'left' ? '整组图片靠左' : align === 'center' ? '整组图片居中' : '整组图片靠右'
+        const button = addIconButton('rte-image-group-align', label, alignIcons[align])
         button.dataset.align = align
         button.addEventListener('click', (event) => {
           event.preventDefault()
@@ -720,6 +755,8 @@ export const ImageGroup = Node.create({
         button.type = 'button'
         button.className = 'rte-image-group-side'
         button.textContent = side === 'left' ? '叠左' : side === 'center' ? '叠中' : '叠右'
+        button.title = side === 'left' ? '两张叠在最左一列' : side === 'center' ? '两张叠在中间一列' : '两张叠在最右一列'
+        button.setAttribute('aria-label', button.title)
         button.addEventListener('click', (event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -812,7 +849,7 @@ export const ImageGroup = Node.create({
         button.className = 'rte-image-group-layout'
         button.dataset.layout = layout
         button.textContent = layout === 'row' ? '横排' : layout === 'rows' ? '上下' : layout
-        button.title = layout === 'row' ? '横排' : layout === '12' ? '左一右二' : layout === '21' ? '左二右一' : '上下两行'
+        button.title = layout === 'row' ? '所有图片排成一行' : layout === '12' ? '左边一张，右边上下两张' : layout === '21' ? '左边上下两张，右边一张' : '图片分成上下两行'
         button.setAttribute('aria-label', button.title)
         button.addEventListener('click', (event) => {
           event.preventDefault()
@@ -824,7 +861,7 @@ export const ImageGroup = Node.create({
         bar.appendChild(button)
       }
 
-      const split = addIconButton('rte-image-group-split', '拆分为单图', 'M2 3h5v10H2zm7 0h5v10H9z')
+      const split = addIconButton('rte-image-group-split', '拆成一张一张的图片，不再成组', 'M2 3h5v10H2zm7 0h5v10H9z')
       split.addEventListener('click', (event) => {
         event.preventDefault()
         event.stopPropagation()

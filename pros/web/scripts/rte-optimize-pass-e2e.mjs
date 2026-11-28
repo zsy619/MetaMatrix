@@ -1,5 +1,5 @@
 /**
- * 审阅「深优化」：整理空格和标点，并给出 12 / 21 一键套用。
+ * 审阅「一键整理」：整理空格和标点，并给出 12 / 21 一键套用。
  * 依赖 http://127.0.0.1:5174/rte-code-gap-preview.html
  */
 import pw from 'playwright-core'
@@ -45,7 +45,7 @@ await page.evaluate((content) => {
 await page.waitForSelector('.ProseMirror img[alt="丙"]')
 
 await page.getByRole('tab', { name: '审阅' }).click()
-await page.locator('button', { hasText: '深优化' }).click()
+await page.locator('button', { hasText: '一键整理' }).click()
 await page.waitForSelector('.rte-optimize-dialog')
 const report = await page.locator('.rte-optimize-dialog').innerText()
 log('报告列出已整理项和 12/21', report.includes('套用 12') && report.includes('套用 21'), report.slice(0, 240))

@@ -1,6 +1,7 @@
 /**
  * 轻量 HTML → Markdown（覆盖标题/列表/引用/代码/链接/粗斜体/表格粗略/分割线）
  */
+import { imageLinkHref } from './rteImageLayout'
 /** 导出的 HTML 里，外链补上 rel，已有 rel 的不改。 */
 export function withExternalLinkRel(html: string): string {
   return String(html || '').replace(/<a\b([^>]*?)>/gi, (full, attrs: string) => {
@@ -54,13 +55,7 @@ function nodeToMd(root: HTMLElement): string {
         parts.push('\n')
       } else if (e.getAttribute('data-type') === 'image-group') {
         const layout = e.getAttribute('data-layout') || 'row'
-        const images = [...e.querySelectorAll('img')].map((img) => {
-          const src = img.getAttribute('src') || ''
-          const alt = img.getAttribute('alt') || 'image'
-          const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
-          const caption = img.getAttribute('data-caption')
-          return `![${alt}](${safeSrc})${caption ? `\n${caption}` : ''}`
-        })
+        const images = [...e.querySelectorAll('img')].map((img) => imageMarkdown(img).trimEnd())
         parts.push(`<!-- image-group:${layout} -->\n${images.join('\n')}\n\n`)
       } else if (tag === 'ul') {
         e.querySelectorAll(':scope > li').forEach((li) => {
@@ -87,11 +82,7 @@ function nodeToMd(root: HTMLElement): string {
       } else if (tag === 'table') {
         parts.push(tableToMd(e) + '\n\n')
       } else if (tag === 'img') {
-        const src = e.getAttribute('src') || ''
-        const alt = e.getAttribute('alt') || e.getAttribute('title') || 'image'
-        // data URL 里可能有空格 / 括号（SVG 快照），用 <...> 包起来才不会截断链接
-        const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
-        parts.push(`![${alt}](${safeSrc})\n\n`)
+        parts.push(imageMarkdown(e))
       } else if (tag === 'br') {
         parts.push('  \n')
       } else {
@@ -101,6 +92,24 @@ function nodeToMd(root: HTMLElement): string {
   }
   walkBlocks(root)
   return parts.join('')
+}
+
+function imageMarkdown(img: HTMLElement): string {
+  const src = img.getAttribute('src') || ''
+  const caption = (img.getAttribute('data-caption') || '').trim()
+  const rawAlt = (img.getAttribute('alt') || '').trim()
+  const title = (img.getAttribute('title') || '').trim()
+  const alt = (rawAlt || (title && title !== caption ? title : '') || 'image')
+    .replace(/\\/g, '\\\\')
+    .replace(/[\[\]]/g, '\\$&')
+    .replace(/\r?\n/g, ' ')
+  // data URL 里可能有空格 / 括号（SVG 快照），用 <...> 包起来才不会截断链接
+  const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
+  const href = imageLinkHref(img.getAttribute('data-href') || '')
+  const body = `![${alt}](${safeSrc})`
+  const linked = href ? `[${body}](${/[\s()]/.test(href) ? `<${href}>` : href})` : body
+  const captionLine = caption && caption !== rawAlt ? `\n${caption}` : ''
+  return `${linked}${captionLine}\n\n`
 }
 
 function inlineMd(el: HTMLElement): string {
@@ -122,7 +131,12 @@ function inlineMd(el: HTMLElement): string {
     }
     else if (tag === 'a') {
       const href = e.getAttribute('href') || ''
-      out += `[${inlineMd(e)}](${href})`
+      if (/^\s*(javascript|data|vbscript):/i.test(href)) out += inlineMd(e)
+      else out += `[${inlineMd(e)}](${href})`
+    } else if (tag === 'img') {
+      out += imageMarkdown(e).trim()
+    } else if (tag === 'del' || tag === 's' || tag === 'strike') {
+      out += `~~${inlineMd(e)}~~`
     } else if (tag === 'br') out += '  \n'
     else if (tag === 'mark') out += `==${inlineMd(e)}==`
     else out += inlineMd(e)

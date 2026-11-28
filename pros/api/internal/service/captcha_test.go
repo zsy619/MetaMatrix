@@ -33,12 +33,59 @@ func TestCaptchaWrongAnswerFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
-	wrong := "ZZZZ"
+	wrong := "ZZZZZZ"
 	if challenge.DebugAnswer == wrong {
-		wrong = "YYYY"
+		wrong = "YYYYYY"
 	}
 	if err := svc.Verify(challenge.ID, wrong); err != ErrCaptchaInvalid {
 		t.Fatalf("wrong answer = %v, want %v", err, ErrCaptchaInvalid)
+	}
+}
+
+// 答案必须落在声明的字符集里。字符集和位数的契约要和前端保持一致，
+// 否则会出现"图片上有的字符输不进去"这类无法排查的问题。
+func TestCaptchaAnswerUsesDeclaredAlphabet(t *testing.T) {
+	svc := NewCaptchaService(5*time.Minute, true)
+	for i := 0; i < 200; i++ {
+		challenge, err := svc.Issue()
+		if err != nil {
+			t.Fatalf("issue: %v", err)
+		}
+		if len(challenge.DebugAnswer) != captchaLength {
+			t.Fatalf("answer %q length = %d, want %d",
+				challenge.DebugAnswer, len(challenge.DebugAnswer), captchaLength)
+		}
+		for _, ch := range challenge.DebugAnswer {
+			if !strings.ContainsRune(captchaAlphabet, ch) {
+				t.Fatalf("answer %q contains %q which is not in the alphabet %q",
+					challenge.DebugAnswer, ch, captchaAlphabet)
+			}
+		}
+	}
+}
+
+// 字符集里必须同时有字母和数字，否则就违背了"字母数字混合"的约定。
+func TestCaptchaAlphabetMixesLettersAndDigits(t *testing.T) {
+	var hasLetter, hasDigit bool
+	for _, ch := range captchaAlphabet {
+		switch {
+		case ch >= 'A' && ch <= 'Z':
+			hasLetter = true
+		case ch >= '0' && ch <= '9':
+			hasDigit = true
+		}
+	}
+	if !hasLetter || !hasDigit {
+		t.Fatalf("alphabet %q must contain both letters and digits", captchaAlphabet)
+	}
+}
+
+// 容易混淆的字符必须剔除，否则用户看错就等于答错。
+func TestCaptchaAlphabetExcludesAmbiguousCharacters(t *testing.T) {
+	for _, ch := range "IO01" {
+		if strings.ContainsRune(captchaAlphabet, ch) {
+			t.Fatalf("alphabet %q must not contain ambiguous character %q", captchaAlphabet, ch)
+		}
 	}
 }
 

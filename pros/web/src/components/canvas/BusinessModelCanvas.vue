@@ -73,6 +73,7 @@ function update(id: BusinessModelBlockId, text: string) {
           <textarea
             :value="block(id)?.text || ''"
             :aria-label="block(id)?.title"
+            placeholder="写在这里"
             @change="update(id, ($event.target as HTMLTextAreaElement).value)"
           />
         </div>
@@ -140,16 +141,75 @@ h3 {
   text-align: center;
 }
 .bmc-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 8px; }
-p { margin: 0 0 6px; color: var(--col-topic); font-size: 12px; flex: none; }
+p {
+  margin: 0 0 8px;
+  padding-left: 8px;
+  border-left: 3px solid var(--col-topic);
+  color: #3c3428;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.5;
+  flex: none;
+}
 textarea {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 88px;
   width: 100%;
-  border: 0;
+  border: 1px dashed rgba(60, 50, 20, 0.22);
+  border-radius: 8px;
+  padding: 10px 12px;
   resize: none;
   font: inherit;
-  background: transparent;
+  font-size: 15px;
+  line-height: 1.55;
+  background: rgba(255, 255, 255, 0.55);
   color: #202124;
 }
-textarea:focus { outline: none; }
+textarea::placeholder { color: #5c564c; }
+textarea:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--cv-focus, #163044);
+  background: #fff;
+}
+
+@media (max-width: 900px) {
+  .bmc { padding-bottom: 28px; }
+
+  .bmc-grid {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    overflow: visible;
+  }
+
+  h3 { font-size: 16px; }
+
+  .bmc-cell--partners,
+  .bmc-cell--activities,
+  .bmc-cell--resources,
+  .bmc-cell--value,
+  .bmc-cell--relationships,
+  .bmc-cell--channels,
+  .bmc-cell--segments,
+  .bmc-cell--costs,
+  .bmc-cell--revenue {
+    grid-area: auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .bmc-body {
+    flex: 0 0 auto;
+    height: auto;
+  }
+
+  textarea {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 120px;
+    field-sizing: content;
+    overflow: hidden;
+  }
+}
 </style>

@@ -93,11 +93,21 @@ function removeCard(cardId: string) {
         </header>
         <div class="cards">
           <article v-for="card in column.cards" :key="card.id">
-            <textarea :value="card.text" :aria-label="`${column.title}卡片`" @change="editCard(card.id, ($event.target as HTMLTextAreaElement).value)" />
+            <textarea :value="card.text" :aria-label="`${column.title}卡片`" @input="editCard(card.id, ($event.target as HTMLTextAreaElement).value)" />
             <div class="kanban-move">
-              <button type="button" :disabled="index === 0" @click="move(card.id, -1)">左移</button>
-              <button type="button" :disabled="index === doc.columns.length - 1" @click="move(card.id, 1)">右移</button>
-              <button type="button" @click="removeCard(card.id)">删除</button>
+              <button
+                v-if="index > 0"
+                type="button"
+                :aria-label="`移到${doc.columns[index - 1].title}`"
+                @click="move(card.id, -1)"
+              >移到{{ doc.columns[index - 1].title }}</button>
+              <button
+                v-if="index < doc.columns.length - 1"
+                type="button"
+                :aria-label="`移到${doc.columns[index + 1].title}`"
+                @click="move(card.id, 1)"
+              >移到{{ doc.columns[index + 1].title }}</button>
+              <button type="button" aria-label="删除卡片" @click="removeCard(card.id)">删除</button>
             </div>
           </article>
         </div>
@@ -115,6 +125,7 @@ function removeCard(cardId: string) {
   flex-direction: column;
   min-height: 0;
   padding: 12px 14px 14px;
+  overflow: auto;
   color: #202124;
   background: var(--cv-page, #f7f7f7);
 }
@@ -148,20 +159,25 @@ header {
 }
 header strong { font-size: 15px; letter-spacing: 0.04em; }
 .count {
-  min-width: 20px;
-  padding: 0 6px;
+  min-width: 22px;
+  padding: 0 7px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.22);
-  font-size: 12px;
+  font-size: 14px;
   text-align: center;
 }
 header button {
   margin-left: auto;
   border: 0;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
   color: #fff;
-  border-radius: 6px;
-  padding: 3px 8px;
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 4px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
 }
 .cards { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px; }
 article {
@@ -174,24 +190,46 @@ article {
 }
 textarea {
   width: 100%;
-  min-height: 48px;
+  min-height: 72px;
   border: 0;
   background: transparent;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
+  overflow: hidden;
   font: inherit;
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--col-topic);
 }
-.kanban-move { display: flex; gap: 4px; }
+.kanban-move {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
 .kanban-move button {
   border: 1px solid color-mix(in srgb, var(--col-header) 35%, #fff);
-  background: var(--col-body);
-  color: var(--col-topic);
-  border-radius: 6px;
-  padding: 1px 6px;
-  font-size: 12px;
+  background: #fff;
+  color: #3c3428;
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
 }
-.kanban-move button:disabled { opacity: 0.4; }
-@media (max-width: 800px) {
-  .kanban-board { grid-template-columns: repeat(4, minmax(160px, 1fr)); overflow: auto; }
+.kanban-move button:last-child { color: #9b1c1c; }
+.kanban-move button:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 1100px) {
+  .kanban { padding-bottom: 28px; }
+  .kanban-board { grid-template-columns: 1fr; overflow: visible; }
+  section { min-height: 220px; height: auto; }
+  .cards { overflow: visible; }
+  header button,
+  .kanban-move button {
+    min-height: 40px;
+    font-size: 15px;
+  }
 }
 </style>

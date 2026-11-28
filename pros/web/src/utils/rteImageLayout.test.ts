@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import {
   clampImageWidth,
+  imageDisplayWidthPatch,
+  imageSizeStyle,
   imageDropKind,
   insertPosAfterDelete,
   normalizeImageAlign,
+  imageLinkHref,
   normalizeImageLayout,
   placementActive,
   sameImageDrop,
@@ -16,6 +19,10 @@ assert.equal(normalizeImageAlign('left'), 'left')
 assert.equal(normalizeImageLayout(undefined), 'block')
 assert.equal(normalizeImageLayout(null, 'left'), 'wrap-left')
 assert.equal(normalizeImageLayout('wrap-right'), 'wrap-right')
+assert.equal(imageLinkHref('https://example.com/doc'), 'https://example.com/doc')
+assert.equal(imageLinkHref('/media/abc-1'), '/media/abc-1')
+assert.equal(imageLinkHref('javascript:alert(1)'), null)
+assert.equal(imageLinkHref('https://user:pass@example.com/a'), null)
 assert.equal(placementActive(undefined, undefined, { align: 'center', layout: 'block' }), true)
 assert.equal(placementActive('left', 'block', { align: 'left', layout: 'block' }), true)
 assert.equal(placementActive('left', 'wrap-left', { align: 'left', layout: 'block' }), false)
@@ -30,6 +37,13 @@ assert.equal(imageDropKind(0.1, 0.1, true), 'before')
 assert.equal(imageDropKind(0.9, 0.9, true), 'after')
 assert.equal(imageDropKind(0.1, 0.5, true), 'left')
 
+assert.deepEqual(imageDisplayWidthPatch(''), { displayWidth: null, width: null, height: null })
+assert.deepEqual(imageDisplayWidthPatch('50%'), { displayWidth: '50%', width: null, height: null })
+assert.deepEqual(imageSizeStyle({ width: 320, height: 180, displayWidth: '50%' }), { width: '320px', height: '180px' })
+assert.deepEqual(imageSizeStyle({ width: 320, height: 180, cropAspect: '1/1' }), { width: '320px', height: 'auto' })
+assert.deepEqual(imageSizeStyle({ height: 180, cropAspect: '16/9' }), { width: 'auto', height: '180px' })
+assert.deepEqual(imageSizeStyle({ displayWidth: '50%' }), { width: '50%', height: 'auto' })
+assert.deepEqual(imageSizeStyle({}), { width: '', height: '' })
 assert.equal(clampImageWidth(20, 400), 48)
 assert.equal(clampImageWidth(900, 640), 640)
 assert.equal(clampImageWidth(320, 640), 320)

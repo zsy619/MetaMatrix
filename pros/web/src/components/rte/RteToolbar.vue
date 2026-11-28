@@ -1,17 +1,105 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { stepRibbonTab } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, blockMenuTitle, clampToolbarQuery, codeLangTitle, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, pageSizeTitle, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHintParts, ribbonTabShort, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarActionTitle, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
+import { TABLE_MENU_ICONS } from './tableMenuIcons'
+import { TABLE_MENU_GROUPS, placeMenuFlyout } from './tableMenuGroups'
+import RteMenuGlyph from './RteMenuGlyph.vue'
+import RteChartGroupMenu from './RteChartGroupMenu.vue'
 import RteColorBoard from './RteColorBoard.vue'
 import RteSpacingFields from './RteSpacingFields.vue'
+import RteTemplatePicker from './RteTemplatePicker.vue'
+import RteWordStatsPanel from './RteWordStatsPanel.vue'
+import RteEmojiPicker from './RteEmojiPicker.vue'
+import RteSpecialCharsPicker from './RteSpecialCharsPicker.vue'
+import { buildWordStatsPanelData } from '../../utils/rteWordStats'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteToolbar 必须放在 RichTextEditor 里')
+/* —— 个性化设置面板：组内按钮的显隐与顺序 —— */
+type GroupButtonEntry = {
+  key: string
+  label: string
+  hidden: boolean
+  canMoveUp: boolean
+  canMoveDown: boolean
+}
+// 用一个已判空的别名，避免闭包里 rte 的可选类型报错（与文件内既有写法保持一致）
+const bindings = rte!
+const groupButtonEntries = computed<GroupButtonEntry[]>(() =>
+  bindings.toolbarGroupButtonEntries(bindings.toolbarGroupButtonsGroupId) as GroupButtonEntry[],
+)
+const groupButtonLabel = computed(() => {
+  const found = bindings.visibleToolbarGroups.find(
+    (group: { id: string; label: string }) => group.id === bindings.toolbarGroupButtonsGroupId,
+  )
+  return found?.label || '本分组'
+})
+const groupButtonVisibleCount = computed(
+  () => groupButtonEntries.value.filter((entry) => !entry.hidden).length,
+)
+/** 上移 / 下移一位。 */
+function moveGroupButtonBy(entry: GroupButtonEntry, dir: -1 | 1) {
+  bindings.moveToolbarGroupButton(bindings.toolbarGroupButtonsGroupId, entry.key, dir)
+}
+/** 置顶 / 置底。 */
+function moveGroupButtonToEdge(entry: GroupButtonEntry, edge: 'top' | 'bottom') {
+  bindings.moveToolbarGroupButtonToEdge(bindings.toolbarGroupButtonsGroupId, entry.key, edge)
+}
+/** Alt + ↑ / ↓ 也可以调顺序（键盘可达）。 */
+function onGroupButtonKeydown(event: KeyboardEvent, entry: GroupButtonEntry) {
+  if (!event.altKey) return
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    moveGroupButtonBy(entry, -1)
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    moveGroupButtonBy(entry, 1)
+  }
+}
+const tableMenuGroup = ref('')
+const lastToolbarQuery = ref('')
+const tableMenuFlyout = ref({ top: 0, left: 0 })
+function openTableMenuGroup(id: string, event: MouseEvent) {
+  tableMenuGroup.value = id
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+  tableMenuFlyout.value = placeMenuFlyout(el)
+}
+function tableMenuOps(keys: readonly string[]) {
+  const items = rte.tableOpItems as Array<{
+    key: string
+    label: string
+    title?: string
+    run: () => void
+    insertCount?: boolean
+    danger?: boolean
+    disabled?: () => boolean
+    sepBefore?: boolean
+    active?: () => boolean
+  }>
+  return keys.map((key) => items.find((op) => op.key === key)).filter((op): op is NonNullable<typeof op> => !!op)
+}
+/** 把导出内部阶段转换为可理解的中文状态，不向用户暴露英文实现标识。 */
+function exportPhaseLabel() {
+  const labels: Record<string, string> = {
+    prepare: '准备导出',
+    rasterize: '生成高清图像',
+    paginate: '规划分页',
+    render: '渲染页面',
+    finalize: '生成文件',
+  }
+  return labels[rte.exportPhase] || '正在导出'
+}
+
 const rteBindings = rte
 const vRteFloat = rteBindings.vRteFloat
 useParentScopeStamp()
+
+/** 字数面板的入参（面板组件自己管排版，这里只做数据汇总）。 */
+const wordStatsPanelProps = computed(() => buildWordStatsPanelData(rte))
 
 /**
  * 图表一级分类（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）。
@@ -30,7 +118,19 @@ function chartCategoriesOf(groupId: string) {
   return chartGroupById.get(groupId)?.categories || []
 }
 
+/** 下拉面板标题：如「基础图表」。 */
+function chartGroupTitle(key: string): string {
+  const group = chartGroupById.get(chartGroupIdOfTool(key))
+  return group ? `${group.group.label}图表` : '图表'
+}
+
+/** 下拉面板副标题：一级分类的说明（折线 / 柱状 / 饼图 / 散点）。 */
+function chartGroupHint(key: string): string {
+  return chartGroupById.get(chartGroupIdOfTool(key))?.group.hint || ''
+}
+
 function onRibbonTab(id: string, event: MouseEvent) {
+  clearToolbarQuery()
   rteBindings.setRibbonTab(id)
   const toolbar = (event.currentTarget as HTMLElement | null)?.closest('.rte-toolbar')
   toolbar?.querySelector(`[data-ribbon-tab="${id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -38,9 +138,33 @@ function onRibbonTab(id: string, event: MouseEvent) {
 }
 
 function onRibbonTabsKeydown(event: KeyboardEvent) {
+  const ids = (rteBindings.ribbonTabs || []).map((tab: { id: string }) => tab.id)
+  if (event.key === 'PageDown' || event.key === 'PageUp') {
+    event.preventDefault()
+    clearToolbarQuery()
+    rteBindings.setRibbonTab(stepRibbonTabBy(ids, rteBindings.ribbonTab, event.key === 'PageDown' ? 3 : -3))
+    return
+  }
+  if (event.altKey && /^[1-9]$/.test(event.key)) {
+    const picked = ribbonTabForDigit(ids, Number(event.key))
+    if (!picked) return
+    event.preventDefault()
+    clearToolbarQuery()
+    rteBindings.setRibbonTab(picked)
+    return
+  }
+  if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+    const typed = ribbonTypeaheadQuery(event.key, rteBindings.toolbarQuery || '')
+    if (typed != null) {
+      event.preventDefault()
+      rteBindings.toolbarQuery = typed
+      const input = document.querySelector('.rte-toolbar-search input')
+      if (input instanceof HTMLInputElement) input.focus()
+      return
+    }
+  }
   const move = event.key === 'ArrowRight' ? 'next' : event.key === 'ArrowLeft' ? 'prev' : event.key === 'Home' ? 'home' : event.key === 'End' ? 'end' : ''
   if (!move) return
-  const ids = (rteBindings.ribbonTabs || []).map((tab: { id: string }) => tab.id)
   const next = stepRibbonTab(ids, rteBindings.ribbonTab, move)
   event.preventDefault()
   rteBindings.setRibbonTab(next)
@@ -49,6 +173,325 @@ function onRibbonTabsKeydown(event: KeyboardEvent) {
     tabs.focus()
     tabs.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }
+}
+
+function toolbarSearchCount(): number {
+  const groups = rteBindings.visibleToolbarGroups || []
+  return groups.reduce((sum: number, group: { tools?: unknown[] }) => sum + (group.tools?.length || 0), 0)
+}
+function toolbarSearchMessage(): string {
+  const groups = rteBindings.visibleToolbarGroups || []
+  const bestTool = groups[0]?.tools?.[0]
+  const best = bestTool?.label || ''
+  const place = groups[0]?.label || ''
+  return toolbarSearchStatus(
+    rteBindings.toolbarQuery || '',
+    toolbarSearchCount(),
+    best,
+    toolbarSearchCount() >= 24,
+    place,
+    toolIsUnavailable(bestTool),
+  )
+}
+/** 栏目悬停提示：显示完整栏目名 + 里面有哪些命令。 */
+const ribbonHint = ref<{ title: string; desc: string; left: number; top: number } | null>(null)
+
+function showRibbonHint(tab: { id: string; label: string }, event: Event) {
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const parts = ribbonTabHintParts(tab.id, tab.label)
+  ribbonHint.value = {
+    title: parts.title,
+    desc: parts.desc,
+    left: Math.round(rect.left + rect.width / 2),
+    top: Math.round(rect.bottom + 6),
+  }
+}
+
+function hideRibbonHint() {
+  ribbonHint.value = null
+}
+
+function ribbonHitCount(id: string): number {
+  if (!rteBindings.toolbarQuery) return 0
+  const group = (rteBindings.visibleToolbarGroups || []).find((item: { id: string; tools?: unknown[] }) => item.id === id)
+  return group?.tools?.length || 0
+}
+function imageLayoutSelected(opt: { align: string; layout: string }): boolean {
+  const attrs = rteBindings.editor?.getAttributes?.('image')
+  return !!attrs && attrs.align === opt.align && attrs.layout === opt.layout
+}
+function currentAlignName(): string {
+  if (rteBindings.isActive?.({ textAlign: 'center' })) return 'center'
+  if (rteBindings.isActive?.({ textAlign: 'right' })) return 'right'
+  if (rteBindings.isActive?.({ textAlign: 'justify' })) return 'justify'
+  if (rteBindings.isActive?.({ textAlign: 'left' })) return 'left'
+  return ''
+}
+function rememberToolbarQuery() {
+  const query = clampToolbarQuery(String(rteBindings.toolbarQuery || '').trim())
+  if (!query) return
+  lastToolbarQuery.value = query
+  try {
+    sessionStorage.setItem(LAST_TOOLBAR_QUERY_KEY, query)
+  } catch {
+    /* 无存储时仍保留本次会话里的上次搜索 */
+  }
+}
+function onToolbarQueryInput() {
+  const next = clampToolbarQuery(String(rteBindings.toolbarQuery || ''))
+  if (next !== rteBindings.toolbarQuery) rteBindings.toolbarQuery = next
+  rememberToolbarQuery()
+}
+function clearToolbarQuery(focusInput = false) {
+  rememberToolbarQuery()
+  rteBindings.toolbarQuery = ''
+  if (focusInput !== true) return
+  void nextTick(() => {
+    const input = document.querySelector('.rte-toolbar-search input')
+    if (input instanceof HTMLInputElement) input.focus()
+  })
+}
+function onGroupPointerDown(id: string, event: PointerEvent) {
+  if (!toolbarGroupReorderAllowed(rteBindings.toolbarQuery || '')) return
+  rteBindings.onToolbarHandlePointerDown(id, event)
+}
+function onGroupRestore(id: string) {
+  if (!toolbarGroupReorderAllowed(rteBindings.toolbarQuery || '')) return
+  rteBindings.restoreToolbarGroupButtons(id)
+}
+function onGroupContextMenu(id: string, event: MouseEvent) {
+  if (!toolbarGroupReorderAllowed(rteBindings.toolbarQuery || '')) return
+  rteBindings.onToolbarGroupContextMenu(id, event)
+}
+function moreMenuButtons(): HTMLElement[] {
+  const root = document.querySelector('.rte-more-menu')
+  if (!root) return []
+  return [...root.querySelectorAll('button')].filter((el): el is HTMLElement => el instanceof HTMLElement && !el.hasAttribute('disabled'))
+}
+function onMoreMenuKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    rteBindings.closeMore()
+    const opener = document.querySelector('[data-rte-anchor="more"]')
+    if (opener instanceof HTMLElement) opener.focus()
+    return
+  }
+  const target = event.target
+  if (target instanceof HTMLElement && target.closest('input, textarea, [contenteditable="true"]')) return
+  const buttons = moreMenuButtons()
+  const current = target instanceof HTMLElement ? target.closest('button') : null
+  const index = current instanceof HTMLElement ? buttons.indexOf(current) : -1
+  const next = menuFocusStep(index, buttons.length, event.key)
+  if (next == null) return
+  event.preventDefault()
+  buttons[next]?.focus()
+}
+function onMoreButtonKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && rteBindings.moreOpen) {
+    event.preventDefault()
+    rteBindings.closeMore()
+    return
+  }
+  if (event.key !== 'ArrowDown') return
+  event.preventDefault()
+  if (!rteBindings.moreOpen) {
+    rteBindings.markToolbarMenuOpening()
+    rteBindings.moreOpen = true
+    return
+  }
+  moreMenuButtons()[0]?.focus()
+}
+function onToolbarSearchKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.stopPropagation()
+    clearToolbarQuery()
+    return
+  }
+  if (event.key === 'Enter' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    focusFirstMatchedTool()
+    return
+  }
+  if (event.altKey && event.key === 'ArrowUp' && !String(rteBindings.toolbarQuery || '').trim() && lastToolbarQuery.value) {
+    event.preventDefault()
+    rteBindings.toolbarQuery = lastToolbarQuery.value
+  }
+}
+function focusFirstMatchedTool() {
+  const best = rteBindings.visibleToolbarGroups?.[0]?.tools?.[0]
+  const button = document.querySelector('[data-search-best] button.rte-tool:not([disabled])')
+    || document.querySelector('.rte-toolbar-tools button.rte-tool:not([disabled])')
+  if (!(button instanceof HTMLElement)) return
+  if (searchEnterActivates(toolbarSearchCount(), toolIsUnavailable(best))) {
+    button.click()
+    clearToolbarQuery()
+    return
+  }
+  button.focus()
+}
+function onMatchedToolKeydown(event: KeyboardEvent) {
+  if (!String(rteBindings.toolbarQuery || '').trim()) return
+  if (event.altKey || event.metaKey || event.ctrlKey) return
+  if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return
+  if (target.closest('input, textarea, [contenteditable="true"]')) return
+  const current = target.closest('button.rte-tool')
+  if (!(current instanceof HTMLElement) || current.hasAttribute('disabled')) return
+  const buttons = [...document.querySelectorAll('.rte-toolbar-tools button.rte-tool:not([disabled])')].filter(
+    (el): el is HTMLElement => el instanceof HTMLElement,
+  )
+  const index = buttons.indexOf(current)
+  if (index < 0) return
+  event.preventDefault()
+  buttons[cycleSearchIndex(index, buttons.length, event.key === 'ArrowRight' ? 1 : -1)]?.focus()
+}
+onMounted(() => {
+  const tab = document.querySelector(`[data-ribbon-tab="${rteBindings.ribbonTab}"]`)
+  tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  try {
+    const saved = sessionStorage.getItem(LAST_TOOLBAR_QUERY_KEY)
+    if (saved) lastToolbarQuery.value = clampToolbarQuery(saved)
+  } catch {
+    /* 读不到上次搜索时，Alt+上 只在本次会话里生效 */
+  }
+  // 任何一次按下（打开颜色面板、点击按钮…）都立刻收起气泡，
+ // 不给提示任何压在面板上的机会。
+  document.addEventListener('mousedown', hideAllHints, true)
+  document.addEventListener('touchstart', hideAllHints, true)
+  // 键盘聚焦时把原生 title 还原，键盘用户仍能拿到提示文本。
+  document.addEventListener('focusin', restoreNativeTitle, true)
+  document.addEventListener('focusout', stripNativeTitle, true)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', hideAllHints, true)
+  document.removeEventListener('touchstart', hideAllHints, true)
+  document.removeEventListener('focusin', restoreNativeTitle, true)
+  document.removeEventListener('focusout', stripNativeTitle, true)
+})
+watch(() => rteBindings.moreOpen, (open) => {
+  if (!open) return
+  void nextTick(() => moreMenuButtons()[0]?.focus())
+})
+watch(() => rteBindings.toolbarQuery, () => {
+  requestAnimationFrame(() => {
+    document.querySelector('[data-search-best]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+})
+
+/** 「更多」面板里的工具栏设置分组清单（勾选显隐 / 调整顺序）。 */
+const showToolbarSettings = ref(false)
+
+/** Telegram 风格的悬停气泡提示：跟随按钮定位，Teleport 到 body，避免被横向滚动容器裁剪。 */
+const tgTip = ref<{ text: string; x: number; y: number; align: 'center' | 'right' } | null>(null)
+let tgTipTimer: number | null = null
+function clearTgTipTimer() {
+  if (tgTipTimer != null) {
+    window.clearTimeout(tgTipTimer)
+    tgTipTimer = null
+  }
+}
+
+/**
+ * 这个按钮下面是否已经展开了浮层面板（注音 / 大小写 / 字号 …）。
+ * 展开时不能再冒气泡：气泡正好落在面板上方，会把第一项盖住。
+ */
+function hasOpenFloatPanel(host: HTMLElement): boolean {
+  if (host.getAttribute('aria-expanded') === 'true') return true
+  const anchor = host.closest('[data-rte-anchor]') as HTMLElement | null
+  const key = anchor?.getAttribute('data-rte-anchor')
+  if (!key) return false
+  return !!document.querySelector(`[data-rte-float-key="${key}"]`)
+}
+
+/**
+ * 常驻气泡提示（Telegram 式）：两种工具栏风格都生效。
+ * - 文本取 data-tip，其次取原生 title（因此禁用原因「（当前不可用）」也能提示）；
+ * - 悬停 320ms 后才出现，移开即消失（Telegram 的延迟提示手感）；
+ * - 永久摘掉原生 title：浏览器自带气泡会压在刚打开的颜色/高亮面板上，
+ *   而且移开按钮后它还会补回来继续挡着；这里只保留 Telegram 风格的自定义气泡。
+ */
+function onToolbarMouseover(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  const host = target?.closest?.('[data-tip], [title]') as HTMLElement | null
+  if (!host) return
+  const text = host.getAttribute('data-tip') || host.getAttribute('title') || ''
+  if (!text) return
+  // 已经展开下拉面板（悬停即展开的那一类）：不冒气泡，避免压住面板第一项。
+  if (hasOpenFloatPanel(host)) {
+    clearTgTipTimer()
+    tgTip.value = null
+    return
+  }
+  if (host.hasAttribute('title')) {
+    // 文本转存到 data-tip：自定义气泡继续可用，原生气泡不再出现。
+    host.setAttribute('data-tip', text)
+    host.removeAttribute('title')
+  }
+  const rect = host.getBoundingClientRect()
+  clearTgTipTimer()
+  tgTipTimer = window.setTimeout(() => {
+    // 面板可能在 320ms 等待期间才展开（悬停展开），这时不再弹气泡。
+    if (hasOpenFloatPanel(host)) {
+      tgTipTimer = null
+      return
+    }
+    // 偏右的按钮：气泡右对齐到按钮右边缘，
+    // 否则居中后会被裁成竖排、还压住右侧面板。
+    const nearRightEdge = rect.right > window.innerWidth * 0.6
+    const x = nearRightEdge ? rect.right : rect.left + rect.width / 2
+    tgTip.value = {
+      text,
+      x: Math.min(Math.max(x, 90), window.innerWidth - 12),
+      y: rect.bottom + 8,
+      align: nearRightEdge ? 'right' : 'center',
+    }
+    tgTipTimer = null
+  }, 320)
+}
+function onToolbarMouseout(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  const host = target?.closest?.('[data-tip], [title]') as HTMLElement | null
+  if (!host) return
+  const to = event.relatedTarget as HTMLElement | null
+  if (to && host.contains(to)) return
+  clearTgTipTimer()
+  tgTipTimer = window.setTimeout(() => {
+    tgTip.value = null
+    tgTipTimer = null
+  }, 80)
+}
+
+/** 立刻收起所有提示气泡（点击 / 打开面板时用）。 */
+function hideAllHints() {
+  clearTgTipTimer()
+  tgTip.value = null
+  ribbonHint.value = null
+}
+
+/** 键盘聚焦：把 data-tip 还原成原生 title，键盘用户仍能拿到提示。 */
+function restoreNativeTitle(event: FocusEvent) {
+  const host = (event.target as HTMLElement | null)?.closest?.('[data-tip]') as HTMLElement | null
+  if (!host) return
+  // 只在键盘聚焦时还原；鼠标点击也会聚焦按钮，还原 title 会让浏览器气泡重新冒出来。
+  try {
+    if (!host.matches(':focus-visible')) return
+  } catch {
+    return
+  }
+  const text = host.getAttribute('data-tip')
+  if (text && !host.hasAttribute('title')) host.setAttribute('title', text)
+}
+
+/** 失焦后继续摘掉原生 title，避免鼠标移回时又冒出浏览器气泡。 */
+function stripNativeTitle(event: FocusEvent) {
+  const host = (event.target as HTMLElement | null)?.closest?.('[data-tip]') as HTMLElement | null
+  if (!host) return
+  const text = host.getAttribute('data-tip')
+  if (text && host.hasAttribute('title')) host.removeAttribute('title')
 }
 
 function toggleChartGroupMenu(key: string) {
@@ -66,6 +509,8 @@ function toggleChartGroupMenu(key: string) {
       :class="{ 'is-one-row': rte.expanded && !rte.toolbarRowsOpen }"
       role="toolbar"
       aria-label="编辑工具栏"
+      @mouseover="onToolbarMouseover"
+      @mouseout="onToolbarMouseout"
     >
       <div data-rte-own class="rte-sr-only" role="status" aria-live="polite" aria-atomic="true">
         {{ rte.rteAriaStatus }}
@@ -79,11 +524,19 @@ function toggleChartGroupMenu(key: string) {
             role="tab"
             class="rte-ribbon-tab"
             :data-ribbon-tab="tab.id"
-            :class="{ active: rte.ribbonTab === tab.id }"
+            :data-ribbon-label="tab.label"
+            :class="{ active: rte.ribbonTab === tab.id, 'is-search-miss': !!rte.toolbarQuery && !ribbonHitCount(tab.id), 'is-search-best': !!rte.toolbarQuery && rte.visibleToolbarGroups[0]?.id === tab.id }"
             :aria-selected="rte.ribbonTab === tab.id"
+            :tabindex="ribbonTabTabIndex(rte.ribbonTab === tab.id)"
+            @mouseenter="showRibbonHint(tab, $event)"
+            @mouseleave="hideRibbonHint"
+            :aria-label="ribbonSearchLabel(tab.label, ribbonHitCount(tab.id))"
+            :aria-keyshortcuts="ribbonTabForDigit((rte.ribbonTabs || []).map((item) => item.id), (rte.ribbonTabs || []).findIndex((item) => item.id === tab.id) + 1) ? 'Alt+' + ((rte.ribbonTabs || []).findIndex((item) => item.id === tab.id) + 1) : undefined"
+            :aria-controls="'rte-group-' + tab.id"
             @click="onRibbonTab(tab.id, $event)"
           >
-            {{ tab.label }}
+            {{ ribbonTabShort(tab.id, tab.label) }}
+            <span v-if="ribbonHitCount(tab.id)" data-rte-own class="rte-ribbon-hit">{{ ribbonHitCount(tab.id) }}</span>
           </button>
         </div>
         <label v-if="rte.viewMode === 'edit' && !rte.focusMode" data-rte-own class="rte-toolbar-search">
@@ -91,11 +544,20 @@ function toggleChartGroupMenu(key: string) {
             data-rte-own
             v-model="rte.toolbarQuery"
             type="search"
-            placeholder="找按钮"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="找按钮，如拼音、饼图"
             aria-label="在工具栏里找按钮"
-            @keydown.escape.stop="rte.toolbarQuery = ''"
+            :title="SEARCH_INPUT_HINT"
+            maxlength="32"
+            :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
+            @focus="($event.target as HTMLInputElement).select()"
+            @input="onToolbarQueryInput"
+            @keydown="onToolbarSearchKeydown"
           />
+          <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" :title="toolbarActionTitle('search-clear')" :aria-label="toolbarActionTitle('search-clear')" @click="clearToolbarQuery(true)">×</button>
         </label>
+        <span v-if="rte.focusMode && rte.viewMode === 'edit'" data-rte-own class="rte-toolbar-mode-note">{{ FOCUS_MODE_NOTE }}</span>
         <span v-if="rte.viewMode !== 'edit'" data-rte-own class="rte-toolbar-mode-note">
           {{ rte.viewMode === 'preview' ? '预览中，编辑工具已收起' : '源码中，编辑工具已收起' }}
         </span>
@@ -120,7 +582,7 @@ function toggleChartGroupMenu(key: string) {
             v-if="rte.viewMode === 'source' && rte.sourceDirty"
             type="button"
             class="rte-tool rte-view-mode-tool rte-view-mode-apply"
-            title="将源码应用到文档"
+            :title="toolbarActionTitle('source-apply')"
             @click="rte.applySourceNow"
           >
             <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">↑</span>
@@ -130,7 +592,7 @@ function toggleChartGroupMenu(key: string) {
             type="button"
             class="rte-tool rte-view-mode-tool rte-toolbar-fold"
             :aria-expanded="rte.toolbarRowsOpen"
-            :title="rte.toolbarRowsOpen ? '收起工具栏面板' : '展开工具栏。收起时放不下的分组在下一行，点此全部显示'"
+            :title="rte.toolbarRowsOpen ? toolbarActionTitle('rows-collapse') : toolbarActionTitle('rows-expand')"
             @click="rte.toggleToolbarRows()"
           >
             <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
@@ -145,12 +607,22 @@ function toggleChartGroupMenu(key: string) {
           data-rte-own
           v-model="rte.toolbarQuery"
           type="search"
-          placeholder="找按钮"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="找按钮，如拼音、饼图"
           aria-label="在工具栏里找按钮"
-          @keydown.escape.stop="rte.toolbarQuery = ''"
+          :title="SEARCH_INPUT_HINT"
+          maxlength="32"
+          :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
+          @focus="($event.target as HTMLInputElement).select()"
+          @input="onToolbarQueryInput"
+          @keydown="onToolbarSearchKeydown"
         />
+        <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" :title="toolbarActionTitle('search-clear')" :aria-label="toolbarActionTitle('search-clear')" @click="clearToolbarQuery(true)">×</button>
       </label>
-      <p v-if="rte.toolbarQuery && !rte.visibleToolbarGroups.length" data-rte-own class="rte-toolbar-mode-note">没有匹配的按钮</p>
+      <span data-rte-own class="rte-sr-only" role="status">{{ toolbarSearchMessage() }}</span>
+      <p v-if="toolbarSearchMessage() && !toolbarSearchCount()" id="rte-toolbar-search-status" data-rte-own class="rte-toolbar-search-jump is-empty">{{ toolbarSearchMessage() }}</p>
+      <button v-else-if="toolbarSearchMessage()" id="rte-toolbar-search-status" data-rte-own type="button" class="rte-toolbar-search-jump" :title="SEARCH_INPUT_HINT" @click="focusFirstMatchedTool">{{ toolbarSearchMessage() }}</button>
       <div data-rte-own
         class="rte-toolbar-tools"
         :class="{
@@ -161,28 +633,32 @@ function toggleChartGroupMenu(key: string) {
         }"
         @dragover.prevent="rte.onToolbarGroupDragOver"
         @drop.prevent="rte.onToolbarGroupDrop"
+        @keydown="onMatchedToolKeydown"
       >
       <div data-rte-own
-        v-for="group in rte.visibleToolbarGroups"
+        v-for="(group, groupIndex) in rte.visibleToolbarGroups"
         :key="group.id"
         class="rte-tool-group"
-        :title="'右键可设置组内按钮的显隐与顺序'"
+        :data-search-best="rte.toolbarQuery && groupIndex === 0 ? '1' : undefined"
+        :title="rte.toolbarQuery ? toolbarActionTitle('group-search-lock') : toolbarActionTitle('group-context')"
         :class="{
           'is-drop-target': rte.toolbarDropIndex === rte.toolbarOrder.indexOf(group.id),
           'is-dragging': rte.toolbarDragSource === group.id,
+          'is-search-group': !!rte.toolbarQuery,
         }"
+        :id="'rte-group-' + group.id"
         :data-group-id="group.id"
-        @contextmenu.prevent="rte.onToolbarGroupContextMenu(group.id, $event)"
+        @contextmenu.prevent="onGroupContextMenu(group.id, $event)"
       >
         <span data-rte-own class="rte-group-head">
           <button data-rte-own
-            v-if="rte.viewMode === 'edit'"
+            v-if="rte.viewMode === 'edit' && !rte.toolbarQuery"
             type="button"
             class="rte-group-handle"
             draggable="false"
             :aria-label="'拖动' + group.label + '分组'"
-            title="拖动整组。Alt+左/右也可移动"
-            @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
+            :title="groupHandleTitle(group.label, group.tools.length)"
+            @pointerdown="onGroupPointerDown(group.id, $event)"
             @pointermove="rte.onToolbarHandlePointerMove"
             @pointerup="rte.onToolbarHandlePointerUp"
             @pointercancel="rte.onToolbarHandlePointerUp"
@@ -192,19 +668,20 @@ function toggleChartGroupMenu(key: string) {
           </button>
           <span data-rte-own
             class="rte-group-label"
-            @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
+            @pointerdown="onGroupPointerDown(group.id, $event)"
             @pointermove="rte.onToolbarHandlePointerMove"
             @pointerup="rte.onToolbarHandlePointerUp"
             @pointercancel="rte.onToolbarHandlePointerUp"
-            title="双击恢复本组按钮的默认显隐和顺序"
-            @dblclick.stop="rte.restoreToolbarGroupButtons(group.id)"
-          >{{ group.label }}</span>
+            :title="rte.toolbarQuery ? toolbarActionTitle('group-search-lock') : toolbarActionTitle('group-dbl-reset')"
+            @dblclick.stop="onGroupRestore(group.id)"
+          >{{ searchGroupCaption(group.label, group.tools.length, !!rte.toolbarQuery) }}</span>
+          <p v-if="group.hiddenAll" data-rte-own class="rte-group-empty">{{ EMPTY_GROUP_NOTE }}</p>
           <button data-rte-own
-            v-if="rte.viewMode === 'edit'"
+            v-if="rte.viewMode === 'edit' && !rte.toolbarQuery"
             type="button"
             class="rte-group-settings"
             :aria-label="group.label + '的个性化设置'"
-            title="本分组的按钮：显示、隐藏、排序。双击组名恢复默认"
+            :title="group.label + '的按钮：显示、隐藏、排序。当前 ' + group.tools.length + ' 个。双击组名恢复默认'"
             @click.stop="rte.onToolbarGroupContextMenu(group.id, $event)"
           >
             ⚙
@@ -223,7 +700,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('heading', el)"
             data-rte-anchor="heading"
             :class="{ active: rte.headingOpen || rte.currentParaStyleLabel !== '正文' }"
-            :title="'段落样式：' + rte.currentParaStyleLabel"
+            :title="toolbarActionTitle('para-current') + rte.currentParaStyleLabel"
             aria-label="段落样式"
             :aria-expanded="rte.headingOpen"
             aria-haspopup="menu"
@@ -266,6 +743,7 @@ function toggleChartGroupMenu(key: string) {
                       active: rte.isBlockMenuActive(it.id),
                       'has-sub': !!it.children,
                     }"
+                    :title="blockMenuTitle(it.id) || undefined"
                     @click="rte.applyBlockMenu(it.id)"
                   >
                     <span data-rte-own class="rte-para-mark">{{ it.mark }}</span>
@@ -286,6 +764,7 @@ function toggleChartGroupMenu(key: string) {
                       :data-para-style="child.id"
                       :aria-checked="rte.isBlockMenuActive(child.id)"
                       :class="{ active: rte.isBlockMenuActive(child.id) }"
+                      :title="blockMenuTitle(child.id) || undefined"
                       @mouseenter="rte.onBlockMenuEnter(child.id)"
                       @click="rte.applyBlockMenu(child.id)"
                     >
@@ -314,7 +793,7 @@ function toggleChartGroupMenu(key: string) {
                 rte.isActive('orderedList') ||
                 rte.isActive('taskList'),
             }"
-            :title="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : '列表（无序 / 有序 / 任务）'"
+            :title="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : toolbarActionTitle('list-menu')"
             :aria-label="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : '列表'"
             aria-haspopup="menu"
             :aria-expanded="rte.listOpen"
@@ -328,7 +807,7 @@ function toggleChartGroupMenu(key: string) {
               />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >列表<span data-rte-own class="rte-caret" aria-hidden="true"></span
+              >{{ listToolLabel(rte.isActive('taskList') ? 'task' : rte.isActive('orderedList') ? 'ordered' : rte.isActive('bulletList') ? 'bullet' : '') }}<span data-rte-own class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
           <Teleport to="body">
@@ -340,56 +819,26 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('list')"
               @mouseleave="rte.onToolMenuLeave($event, 'list', () => (rte.listOpen = false))"
             >
-              <button data-rte-own
-                type="button"
-                :class="{ active: rte.isActive('bulletList') }"
-                @click="rte.toggleBulletList(); rte.listOpen = false"
-              >
-                无序列表
-              </button>
-              <button data-rte-own
-                type="button"
-                :class="{ active: rte.isActive('orderedList') }"
-                @click="rte.toggleOrderedList(); rte.listOpen = false"
-              >
-                有序列表
-              </button>
-              <button data-rte-own
-                type="button"
-                :class="{ active: rte.isActive('taskList') }"
-                @click="rte.toggleTaskList(); rte.listOpen = false"
-              >
-                任务列表
-              </button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('bulletList') }" :aria-pressed="rte.isActive('bulletList')" :title="toolbarMenuItemTitle('无序列表')" @click="rte.toggleBulletList(); rte.listOpen = false"><RteMenuGlyph label="无序列表" />无序列表</button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('orderedList') }" :aria-pressed="rte.isActive('orderedList')" :title="toolbarMenuItemTitle('有序列表')" @click="rte.toggleOrderedList(); rte.listOpen = false"><RteMenuGlyph label="有序列表" />有序列表</button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('taskList') }" :aria-pressed="rte.isActive('taskList')" :title="toolbarMenuItemTitle('任务列表')" @click="rte.toggleTaskList(); rte.listOpen = false"><RteMenuGlyph label="任务列表" />任务列表</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.continueOrderedNumbering()">续号</button>
-              <button data-rte-own type="button" @click="rte.restartOrderedNumbering()">新列表</button>
-              <button data-rte-own type="button" @click="rte.applyListStart()">修改编号值…</button>
-              <button data-rte-own type="button" @click="rte.renumberListFromHere()">从此处重编号</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('list-continue')" @click="rte.continueOrderedNumbering()"><RteMenuGlyph label="续号" />续号</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('list-restart')" @click="rte.restartOrderedNumbering()"><RteMenuGlyph label="新列表" />新列表</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('list-start')" @click="rte.applyListStart()"><RteMenuGlyph label="修改编号值…" />修改编号值…</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('list-renumber')" @click="rte.renumberListFromHere()"><RteMenuGlyph label="从此处重编号" />从此处重编号</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.applyListStyle('decimal')">数字 1. 2. 3.</button>
-              <button data-rte-own type="button" @click="rte.applyListStyle('lower-alpha')">字母 a. b. c.</button>
-              <button data-rte-own type="button" @click="rte.applyListStyle('lower-roman')">罗马 i. ii. iii.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'decimal' }" :aria-pressed="rte.currentOrderedListStyle() === 'decimal'" :title="toolbarMenuItemTitle('数字 1. 2. 3.')" @click="rte.applyListStyle('decimal')"><RteMenuGlyph label="数字 1. 2. 3." />数字 1. 2. 3.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-alpha' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-alpha'" :title="toolbarMenuItemTitle('字母 a. b. c.')" @click="rte.applyListStyle('lower-alpha')"><RteMenuGlyph label="字母 a. b. c." />字母 a. b. c.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-roman' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-roman'" :title="toolbarMenuItemTitle('罗马 i. ii. iii.')" @click="rte.applyListStyle('lower-roman')"><RteMenuGlyph label="罗马 i. ii. iii." />罗马 i. ii. iii.</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own v-if="rte.listDepthLabel" class="rte-menu-hint">{{ rte.listDepthLabel }}</div>
               <div data-rte-own class="rte-menu-hint">Tab / Shift+Tab 调整层级</div>
-              <button data-rte-own
-                type="button"
-                @click="rte.indentBlock(); rte.listOpen = false"
-              >
-                增加缩进
-              </button>
-              <button data-rte-own type="button" @click="rte.padListItem(1)">只缩进文字</button>
-              <button data-rte-own type="button" @click="rte.padListItem(-1)">只减少缩进</button>
-              <button data-rte-own type="button" @click="rte.toggleTaskOpenOnly()">
-                {{ rte.taskOpenOnly ? '显示全部任务' : '只看未完成' }}
-              </button>
-              <button data-rte-own
-                type="button"
-                @click="rte.outdentBlock(); rte.listOpen = false"
-              >
-                减少缩进
-              </button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('增加缩进')" @click="rte.indentBlock(); rte.listOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('只缩进文字')" @click="rte.padListItem(1)"><RteMenuGlyph label="只缩进文字" />只缩进文字</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('只减少缩进')" @click="rte.padListItem(-1)"><RteMenuGlyph label="只减少缩进" />只减少缩进</button>
+              <button data-rte-own type="button" :class="{ active: rte.taskOpenOnly }" :aria-pressed="rte.taskOpenOnly" @click="rte.toggleTaskOpenOnly()"><RteMenuGlyph :label="rte.taskOpenOnly ? '显示全部任务' : '只看未完成'" />{{ rte.taskOpenOnly ? '显示全部任务' : '只看未完成' }}</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('减少缩进')" @click="rte.outdentBlock(); rte.listOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
             </div>
           </Teleport>
         </div>
@@ -415,7 +864,7 @@ function toggleChartGroupMenu(key: string) {
                 rte.isActive('formDateInput') ||
                 rte.isActive('formSwitch'),
             }"
-            title="表单"
+            :title="t.title || toolbarActionTitle('form-menu')"
             aria-label="插入表单控件"
             aria-haspopup="menu"
             :aria-expanded="rte.formOpen"
@@ -437,44 +886,20 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('form')"
               @mouseleave="rte.onToolMenuLeave($event, 'form', () => (rte.formOpen = false))"
             >
-              <button data-rte-own type="button" @click.stop="rte.insertFormRadio()">
-                单选组
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormCheckbox()">
-                多选组
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormText()">
-                文本输入
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormTextarea()">
-                多行文本
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormNumber()">
-                数字输入
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormSelect()">
-                下拉选择
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormDate()">
-                日期
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormDateTime()">
-                日期时间
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormSwitch()">
-                开关
-              </button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-radio')" @click.stop="rte.insertFormRadio()"><RteMenuGlyph label="单选组" />单选组</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-check')" @click.stop="rte.insertFormCheckbox()"><RteMenuGlyph label="多选组" />多选组</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-text')" @click.stop="rte.insertFormText()"><RteMenuGlyph label="文本输入" />文本输入</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-textarea')" @click.stop="rte.insertFormTextarea()"><RteMenuGlyph label="多行文本" />多行文本</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-number')" @click.stop="rte.insertFormNumber()"><RteMenuGlyph label="数字输入" />数字输入</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-select')" @click.stop="rte.insertFormSelect()"><RteMenuGlyph label="下拉选择" />下拉选择</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-date')" @click.stop="rte.insertFormDate()"><RteMenuGlyph label="日期" />日期</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-datetime')" @click.stop="rte.insertFormDateTime()"><RteMenuGlyph label="日期时间" />日期时间</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-switch')" @click.stop="rte.insertFormSwitch()"><RteMenuGlyph label="开关" />开关</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click.stop="rte.duplicateSelectedForm()">
-                复制当前字段
-              </button>
-              <button data-rte-own type="button" @click.stop="rte.checkFormFields()">
-                检查填写
-              </button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-duplicate')" @click.stop="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-check-fill')" @click.stop="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click.stop="rte.formOpen = false; rte.openTableDialog()">
-                表格
-              </button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('table-size-dialog')" @click.stop="rte.formOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
             </div>
           </Teleport>
         </div>
@@ -489,7 +914,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('template', el)" data-rte-anchor="template"
             :class="{ active: rte.templateOpen }"
-            title="插入模板"
+            :title="t.title || toolbarActionTitle('template-menu')"
             aria-label="插入模板"
             aria-haspopup="menu"
             :aria-expanded="rte.templateOpen"
@@ -511,26 +936,7 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('template')"
               @mouseleave="rte.onToolMenuLeave($event, 'template', () => (rte.templateOpen = false))"
             >
-              <div data-rte-own class="rte-template-menu-body">
-                <template v-for="g in rte.RTE_DOC_TEMPLATE_GROUPS" :key="g.id">
-                  <div data-rte-own class="rte-menu-section-label">{{ g.label }}</div>
-                  <div data-rte-own class="rte-template-grid">
-                    <button data-rte-own
-                      v-for="tpl in rte.RTE_DOC_TEMPLATES.filter((x: any) => x.group === g.id)"
-                      :key="tpl.id"
-                      type="button"
-                      class="rte-template-item"
-                      :title="tpl.description || tpl.label"
-                      @click.stop="rte.insertDocTemplate(tpl.id)"
-                    >
-                      <span data-rte-own class="rte-template-item-label">{{ tpl.label }}</span>
-                      <span data-rte-own v-if="tpl.description" class="rte-template-item-desc">{{
-                        tpl.description
-                      }}</span>
-                    </button>
-                  </div>
-                </template>
-              </div>
+              <RteTemplatePicker @select="rte.insertDocTemplate($event)" />
             </div>
           </Teleport>
         </div>
@@ -545,7 +951,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('highlight', el)" data-rte-anchor="highlight"
             :class="{ active: rte.isActive('highlight') || rte.highlightOpen }"
-            title="高亮颜色"
+            :title="t.title || toolbarActionTitle('highlight-menu')"
             aria-label="高亮颜色"
             :aria-expanded="rte.highlightOpen"
             aria-haspopup="dialog"
@@ -582,7 +988,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('color', el)" data-rte-anchor="color"
             :class="{ active: rte.colorOpen }"
-            title="文字颜色"
+            :title="t.title || toolbarActionTitle('color-menu')"
             aria-label="文字颜色"
             :aria-expanded="rte.colorOpen"
             aria-haspopup="dialog"
@@ -644,7 +1050,8 @@ function toggleChartGroupMenu(key: string) {
                 class="rte-font-size-entry"
                 type="text"
                 placeholder="小四 或 12"
-                aria-label="输入字号"
+                :title="toolbarActionTitle('font-size-input')"
+                aria-label="输入字号，按 Enter 应用"
                 @mousedown.stop
                 @keydown.enter.prevent="rte.applyFontSize(($event.target as HTMLInputElement).value)"
               />
@@ -654,20 +1061,18 @@ function toggleChartGroupMenu(key: string) {
                 :key="'fs-recent-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontSize() || '')"
                 @click="rte.applyFontSize(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :label="opt.label" fallback="fontSize" />{{ opt.label }}</button>
               <div v-if="rte.recentFontSizeOptions.length" data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own
                 v-for="opt in rte.FONT_SIZE_OPTIONS"
                 :key="'fs-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontSize() || '')"
                 @click="rte.applyFontSize(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :label="opt.label" fallback="fontSize" />{{ opt.label }}</button>
             </div>
           </Teleport>
         </div>
@@ -682,14 +1087,14 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('fontFamily', el)" data-rte-anchor="fontFamily"
             :class="{ active: rte.fontFamilyOpen || !!rte.currentFontFamily() }"
-            title="字体"
+            :title="'字体：' + fontFamilyCaption(rte.currentFontFamily(), rte.FONT_FAMILY_OPTIONS)"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.fontSizeOpen = false; rte.lineHeightOpen = false; rte.moreFontSizeOpen = false; rte.moreFontFamilyOpen = false; rte.moreLineHeightOpen = false; rte.headingOpen = false; rte.listOpen = false; rte.formOpen = false; rte.templateOpen = false; rte.alignOpen = false; rte.fontFamilyOpen = !rte.fontFamilyOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('fontFamily')" class="rte-ep-icon" />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >字体<span data-rte-own class="rte-caret" aria-hidden="true"></span
+              >{{ fontFamilyCaption(rte.currentFontFamily(), rte.FONT_FAMILY_OPTIONS) }}<span data-rte-own class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
           <Teleport to="body">
@@ -706,11 +1111,10 @@ function toggleChartGroupMenu(key: string) {
                 :key="'ff-' + (opt.value || 'default')"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontFamily() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontFamily() || '')"
                 :style="opt.value ? { fontFamily: opt.value } : undefined"
                 @click="rte.applyFontFamily(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :label="opt.label" fallback="fontFamily" />{{ opt.label }}</button>
             </div>
           </Teleport>
         </div>
@@ -725,14 +1129,14 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('lineHeight', el)" data-rte-anchor="lineHeight"
             :class="{ active: rte.lineHeightOpen || !!rte.currentLineHeight() }"
-            title="行距"
+            :title="'行距：' + lineHeightCaption(rte.currentLineHeight(), rte.LINE_HEIGHT_OPTIONS)"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.fontSizeOpen = false; rte.fontFamilyOpen = false; rte.moreFontSizeOpen = false; rte.moreFontFamilyOpen = false; rte.moreLineHeightOpen = false; rte.headingOpen = false; rte.listOpen = false; rte.formOpen = false; rte.templateOpen = false; rte.alignOpen = false; rte.lineHeightOpen = !rte.lineHeightOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('lineHeight')" class="rte-ep-icon" />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >行距<span data-rte-own class="rte-caret" aria-hidden="true"></span
+              >{{ lineHeightCaption(rte.currentLineHeight(), rte.LINE_HEIGHT_OPTIONS) }}<span data-rte-own class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
           <Teleport to="body">
@@ -749,10 +1153,9 @@ function toggleChartGroupMenu(key: string) {
                 :key="'lh-' + (opt.value || 'default')"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentLineHeight() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentLineHeight() || '')"
                 @click="rte.applyLineHeight(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :label="opt.label" fallback="lineHeight" />{{ opt.label }}</button>
             </div>
           </Teleport>
         </div>
@@ -768,7 +1171,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('linkButton', el)"
             data-rte-anchor="linkButton"
             :class="{ active: rte.linkButtonOpen || rte.isActive('linkButton') }"
-            title="插入打开链接的按钮"
+            :title="t.title || toolbarActionTitle('link-button-menu')"
             aria-label="按钮"
             aria-haspopup="menu"
             :aria-expanded="rte.linkButtonOpen"
@@ -792,14 +1195,11 @@ function toggleChartGroupMenu(key: string) {
                 v-for="tone in rte.LINK_BUTTON_TONES"
                 :key="'lb-' + tone.id"
                 type="button"
+                :title="toolbarMenuItemTitle(tone.label + '按钮')"
                 @click="rte.paintLinkButton(tone.id)"
-              >
-                {{ tone.label }}按钮
-              </button>
+              ><RteMenuGlyph :id="tone.id" :label="tone.label + '按钮'" />{{ tone.label }}按钮</button>
               <div data-rte-own v-if="rte.isActive('linkButton')" class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own v-if="rte.isActive('linkButton')" type="button" @click="rte.editLinkButton()">
-                修改文字和链接
-              </button>
+              <button data-rte-own v-if="rte.isActive('linkButton')" type="button" :title="toolbarMenuItemTitle('修改文字和链接')" @click="rte.editLinkButton()"><RteMenuGlyph label="修改文字和链接" />修改文字和链接</button>
             </div>
           </Teleport>
         </div>
@@ -819,7 +1219,7 @@ function toggleChartGroupMenu(key: string) {
                 rte.isActive({ textAlign: 'right' }) ||
                 rte.isActive({ textAlign: 'justify' }),
             }"
-            title="对齐"
+            :title="alignToolTitle(currentAlignName())"
             aria-label="对齐"
             aria-haspopup="menu"
             :aria-expanded="rte.alignOpen"
@@ -828,7 +1228,7 @@ function toggleChartGroupMenu(key: string) {
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('align')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">对齐</span>
+            <span data-rte-own class="rte-tool-label">对齐<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -839,35 +1239,26 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('align')"
               @mouseleave="rte.onToolMenuLeave($event, 'align', () => (rte.alignOpen = false))"
             >
-              <button data-rte-own type="button" @click="rte.setAlign('left'); rte.alignOpen = false">
-                左对齐
-              </button>
-              <button data-rte-own type="button" @click="rte.setAlign('center'); rte.alignOpen = false">
-                居中
-              </button>
-              <button data-rte-own type="button" @click="rte.setAlign('right'); rte.alignOpen = false">
-                右对齐
-              </button>
-              <button data-rte-own type="button" @click="rte.setAlign('justify'); rte.alignOpen = false">
-                两端对齐
-              </button>
+              <button data-rte-own type="button" :class="{ active: currentAlignName() === 'left' }" :aria-pressed="currentAlignName() === 'left'" @click="rte.setAlign('left'); rte.alignOpen = false"><RteMenuGlyph label="左对齐" />左对齐</button>
+              <button data-rte-own type="button" :class="{ active: currentAlignName() === 'center' }" :aria-pressed="currentAlignName() === 'center'" @click="rte.setAlign('center'); rte.alignOpen = false"><RteMenuGlyph label="居中" />居中</button>
+              <button data-rte-own type="button" :class="{ active: currentAlignName() === 'right' }" :aria-pressed="currentAlignName() === 'right'" @click="rte.setAlign('right'); rte.alignOpen = false"><RteMenuGlyph label="右对齐" />右对齐</button>
+              <button data-rte-own type="button" :class="{ active: currentAlignName() === 'justify' }" :aria-pressed="currentAlignName() === 'justify'" @click="rte.setAlign('justify'); rte.alignOpen = false"><RteMenuGlyph label="两端对齐" />两端对齐</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.indentBlock(); rte.alignOpen = false">增加缩进</button>
-              <button data-rte-own type="button" @click="rte.outdentBlock(); rte.alignOpen = false">减少缩进</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('增加缩进')" @click="rte.indentBlock(); rte.alignOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('减少缩进')" @click="rte.outdentBlock(); rte.alignOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
               <button data-rte-own
                 type="button"
                 :class="{ active: rte.currentTextIndent() === '2em' }"
+                :aria-pressed="rte.currentTextIndent() === '2em'"
+                :title="toolbarMenuItemTitle('首行缩进 2 字')"
                 @click="rte.setFirstLineIndent(true); rte.alignOpen = false"
-              >
-                首行缩进 2 字
-              </button>
+              ><RteMenuGlyph label="首行缩进 2 字" />首行缩进 2 字</button>
               <button data-rte-own
                 type="button"
                 :disabled="!rte.currentTextIndent()"
+                :title="toolbarMenuItemTitle('取消首行缩进')"
                 @click="rte.setFirstLineIndent(false); rte.alignOpen = false"
-              >
-                取消首行缩进
-              </button>
+              ><RteMenuGlyph label="取消首行缩进" />取消首行缩进</button>
             </div>
           </Teleport>
         </div>
@@ -888,7 +1279,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('table', el)" data-rte-anchor="table"
             :class="{ active: rte.tableMenuOpen || rte.tableQuickOpen || rte.tableDialogOpen || rte.isInTable() }"
-            :title="rte.isInTable() ? '表格操作' : '插入表格'"
+            :title="rte.isInTable() ? toolbarActionTitle('table-inside') : toolbarActionTitle('table-insert')"
             aria-label="表格"
             aria-haspopup="menu"
             :aria-expanded="rte.isInTable() ? rte.tableMenuOpen : rte.tableQuickOpen"
@@ -901,7 +1292,7 @@ function toggleChartGroupMenu(key: string) {
               />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >表格<span data-rte-own
+              >{{ tableToolLabel(!!rte.isInTable()) }}<span data-rte-own
                 v-if="rte.isInTable()"
                 class="rte-caret"
                 aria-hidden="true"
@@ -940,7 +1331,7 @@ function toggleChartGroupMenu(key: string) {
                   @click="rte.insertQuickTable(cell.r, cell.c)"
                 />
               </div>
-              <button data-rte-own type="button" class="rte-table-quick-more" @click="rte.tableQuickOpen = false; rte.openTableDialog()">
+              <button data-rte-own type="button" class="rte-table-quick-more" :title="toolbarMenuItemTitle('自定义尺寸…')" @click="rte.tableQuickOpen = false; rte.openTableDialog()">
                 自定义尺寸…
               </button>
             </div>
@@ -953,18 +1344,68 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('table')"
               @mouseleave="rte.onToolMenuLeave($event, 'table', rte.closeTableMenu)"
             >
-              <template v-for="op in rte.tableOpItems" :key="op.key">
-                <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+              <div data-rte-own
+                v-for="group in TABLE_MENU_GROUPS"
+                :key="'tbl-group-' + group.id"
+                class="rte-table-ctx-group"
+              >
                 <button data-rte-own
                   type="button"
                   role="menuitem"
-                  :class="{ danger: op.danger }"
-                  :disabled="op.disabled?.()"
-                  @click="op.run()"
+                  :class="{ active: tableMenuGroup === group.id }"
+                  :title="group.title"
+                  :aria-expanded="tableMenuGroup === group.id"
+                  @mouseenter="openTableMenuGroup(group.id, $event)"
+                  @click.stop="openTableMenuGroup(group.id, $event)"
                 >
-                  {{ op.label }}
+                  <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[group.id]" /></span>
+                  <span data-rte-own class="rte-table-ctx-label">{{ group.label }}</span>
+                  <span data-rte-own class="rte-table-ctx-caret" aria-hidden="true">▸</span>
                 </button>
-              </template>
+                <div data-rte-own
+                  v-if="tableMenuGroup === group.id"
+                  class="rte-table-ctx-flyout"
+                  :style="{ top: tableMenuFlyout.top + 'px', left: tableMenuFlyout.left + 'px' }"
+                  @mousedown.stop
+                >
+                  <template v-for="op in tableMenuOps(group.keys)" :key="op.key">
+                    <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
+                      <button data-rte-own type="button" role="menuitem" :title="op.title" @click="op.run()">
+                        <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
+                        <span data-rte-own>{{ op.label }}</span>
+                      </button>
+                      <label data-rte-own class="rte-table-insert-count">
+                        <input data-rte-own
+                          v-model.number="rte.tableInsertCounts[op.key]"
+                          type="number"
+                          min="1"
+                          max="99"
+                          step="1"
+                          inputmode="numeric"
+                          :aria-label="op.label + '数量'"
+                          :title="toolbarActionTitle('table-insert-count')"
+                          @mousedown.stop="rte.rememberTableInsertSelection()"
+                          @click.stop
+                          @keydown.stop
+                          @blur="rte.normalizeTableInsertCount(op.key)"
+                        />
+                      </label>
+                    </div>
+                    <button data-rte-own
+                      v-else
+                      type="button"
+                      role="menuitem"
+                      :class="{ danger: op.danger, active: op.active?.() }"
+                      :title="op.title || op.label"
+                      :disabled="op.disabled?.()"
+                      @click="op.run()"
+                    >
+                      <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
+                      <span data-rte-own>{{ op.label }}</span>
+                    </button>
+                  </template>
+                </div>
+              </div>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own class="rte-menu-hint-line">拖拽列边缘调整列宽。多选单元格后可合并。</div>
               <div data-rte-own class="rte-table-cell-style-title" style="padding: 4px 10px">单元格背景</div>
@@ -974,7 +1415,7 @@ function toggleChartGroupMenu(key: string) {
                   :key="'menu-bg-' + p.value"
                   type="button"
                   class="rte-table-swatch"
-                  :title="p.label"
+                  :title="p.value ? '单元格底色：' + p.label : toolbarActionTitle('cell-fill-clear')"
                   :style="p.value ? { background: p.value } : undefined"
                   @click="rte.setTableCellBg(p.value); rte.closeTableMenu()"
                 >{{ p.value ? '' : '无' }}</button>
@@ -982,12 +1423,15 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 role="menuitem"
+                :title="toolbarActionTitle('table-another')"
                 @click="rte.closeTableMenu(); rte.openTableDialog()"
               >
-                插入表格
+                <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS['insert-table']" /></span>
+                <span data-rte-own>插入表格</span>
               </button>
-              <button data-rte-own type="button" role="menuitem" @click="rte.toggleTableZebra(); rte.closeTableMenu()">
-                斑马纹
+              <button data-rte-own type="button" role="menuitem" :title="toolbarActionTitle('table-zebra')" @click="rte.toggleTableZebra(); rte.closeTableMenu()">
+                <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS.zebra" /></span>
+                <span data-rte-own>斑马纹</span>
               </button>
             </div>
           </Teleport>
@@ -1003,7 +1447,9 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('import', el)" data-rte-anchor="import"
             :class="{ active: rte.importMenuOpen }"
-            title="导入"
+            :title="t.title || toolbarActionTitle('import-menu')"
+            aria-haspopup="menu"
+            :aria-expanded="rte.importMenuOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.importMenuOpen = !rte.importMenuOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1025,14 +1471,14 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('import')"
               @mouseleave="rte.onToolMenuLeave($event, 'import', rte.closeImportMenu)"
             >
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.pickImportDocument">
+              <button data-rte-own type="button" class="rte-import-item" :title="toolbarActionTitle('import-doc')" @click.stop="rte.pickImportDocument">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('importDoc')" class="rte-ep-icon" />
                   <span data-rte-own>导入文档</span>
                 </span>
                 <span data-rte-own class="rte-import-pill">MD/Doc</span>
               </button>
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.openImportLinkDialog">
+              <button data-rte-own type="button" class="rte-import-item" :title="toolbarActionTitle('import-link')" @click.stop="rte.openImportLinkDialog">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('importLink')" class="rte-ep-icon" />
                   <span data-rte-own>导入链接</span>
@@ -1053,7 +1499,9 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('export', el)" data-rte-anchor="export"
             :class="{ active: rte.exportMenuOpen }"
-            title="导出"
+            :title="t.title || toolbarActionTitle('export-menu')"
+            aria-haspopup="menu"
+            :aria-expanded="rte.exportMenuOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.exportMenuOpen = !rte.exportMenuOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1075,28 +1523,28 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('export')"
               @mouseleave="rte.onToolMenuLeave($event, 'export', rte.closeExportMenu)"
             >
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.copyAsFeishuHtml">
+              <button data-rte-own type="button" class="rte-import-item" :title="toolbarActionTitle('export-feishu')" @click.stop="rte.copyAsFeishuHtml">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('exportHtml')" class="rte-ep-icon" />
                   <span data-rte-own>复制为 HTML</span>
                 </span>
                 <span data-rte-own class="rte-import-pill">飞书</span>
               </button>
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.exportAsHtml">
+              <button data-rte-own type="button" class="rte-import-item" :title="toolbarActionTitle('export-html')" @click.stop="rte.exportAsHtml">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('exportHtml')" class="rte-ep-icon" />
                   <span data-rte-own>导出 HTML</span>
                 </span>
                 <span data-rte-own class="rte-import-pill">.html</span>
               </button>
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.exportAsPlainText">
+              <button data-rte-own type="button" class="rte-import-item" :title="toolbarActionTitle('export-text')" @click.stop="rte.exportAsPlainText">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('exportText')" class="rte-ep-icon" />
                   <span data-rte-own>导出纯文本</span>
                 </span>
                 <span data-rte-own class="rte-import-pill">.txt</span>
               </button>
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.exportAsMarkdown">
+              <button data-rte-own type="button" class="rte-import-item" :title="toolbarActionTitle('export-md')" @click.stop="rte.exportAsMarkdown">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('exportText')" class="rte-ep-icon" />
                   <span data-rte-own>导出 Markdown</span>
@@ -1106,6 +1554,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 class="rte-import-item"
+                :title="rte.exportBusy ? '正在导出，请稍候' : toolbarActionTitle('export-png')"
                 :disabled="rte.exportBusy"
                 @click.stop="rte.exportAsPng"
               >
@@ -1118,6 +1567,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 class="rte-import-item"
+                :title="rte.exportBusy ? '正在导出，请稍候' : toolbarActionTitle('export-pdf')"
                 :disabled="rte.exportBusy"
                 @click.stop="rte.exportAsPdf"
               >
@@ -1130,6 +1580,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 class="rte-import-item"
+                :title="rte.exportBusy ? '正在导出，请稍候' : toolbarActionTitle('export-word')"
                 :disabled="rte.exportBusy"
                 @click.stop="rte.exportAsDocx"
               >
@@ -1147,8 +1598,8 @@ function toggleChartGroupMenu(key: string) {
           type="button"
           class="rte-tool"
           :class="{ active: rte.attachDialogOpen }"
-          :title="t.title || t.label"
-          :aria-label="t.title || t.label"
+          :title="t.title || toolbarActionTitle('attach-menu')"
+          :aria-label="t.title || toolbarActionTitle('attach-menu')"
           aria-haspopup="dialog"
           @click="t.run?.()"
         >
@@ -1195,8 +1646,8 @@ function toggleChartGroupMenu(key: string) {
               :ref="(el) => rte.setFloatAnchor('codeLang', el)"
               data-rte-anchor="codeLang"
               :class="{ active: rte.codeLangOpen }"
-              title="代码语言"
-              aria-label="代码语言"
+              :title="'代码语言：' + rte.codeLanguageLabel(rte.currentCodeLanguage())"
+              :aria-label="'代码语言：' + rte.codeLanguageLabel(rte.currentCodeLanguage())"
               :aria-expanded="rte.codeLangOpen"
               aria-haspopup="listbox"
               @mousedown.prevent
@@ -1223,10 +1674,9 @@ function toggleChartGroupMenu(key: string) {
                   role="option"
                   :class="{ active: rte.currentCodeLanguage() === opt.value }"
                   :aria-selected="rte.currentCodeLanguage() === opt.value"
+                  :title="codeLangTitle(opt.label) || undefined"
                   @click="rte.applyCodeLanguage(opt.value)"
-                >
-                  {{ opt.label }}
-                </button>
+                ><RteMenuGlyph :id="opt.value" :label="opt.label" fallback="code" />{{ opt.label }}</button>
               </div>
             </Teleport>
           </div>
@@ -1236,8 +1686,8 @@ function toggleChartGroupMenu(key: string) {
             class="rte-code-flag-btn"
             :class="{ 'is-on': rte.codeBlockFlag('lineNumbers') }"
             :aria-pressed="rte.codeBlockFlag('lineNumbers')"
-            title="显示行号"
-            aria-label="行号"
+            :title="toolbarActionTitle('code-lines')"
+            :aria-label="toolbarActionTitle('code-lines')"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('lineNumbers')"
           >
@@ -1249,8 +1699,8 @@ function toggleChartGroupMenu(key: string) {
             class="rte-code-flag-btn"
             :class="{ 'is-on': rte.codeBlockFlag('wordWrap') }"
             :aria-pressed="rte.codeBlockFlag('wordWrap')"
-            title="自动换行"
-            aria-label="自动换行"
+            :title="toolbarActionTitle('code-wrap')"
+            :aria-label="toolbarActionTitle('code-wrap')"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('wordWrap')"
           >
@@ -1260,8 +1710,8 @@ function toggleChartGroupMenu(key: string) {
             v-if="rte.isActive('codeBlock')"
             type="button"
             class="rte-code-copy-btn"
-            title="复制代码块"
-            aria-label="复制代码块"
+            :title="toolbarActionTitle('code-copy')"
+            :aria-label="toolbarActionTitle('code-copy')"
             @mousedown.prevent
             @click="rte.copyActiveCodeBlock"
           >
@@ -1280,13 +1730,15 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('emoji', el)"
             data-rte-anchor="emoji"
             :class="{ active: rte.emojiOpen }"
-            title="表情"
+            aria-haspopup="dialog"
+            :aria-expanded="rte.emojiOpen"
+            :title="rte.emojiOpen ? undefined : t.title || toolbarActionTitle('emoji-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.closeFontMenus(); rte.specialCharsOpen = false; rte.emojiOpen = !rte.emojiOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('emoji')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">表情<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ t.label || '表情' }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1297,33 +1749,11 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('emoji')"
               @mouseleave="rte.onToolMenuLeave($event, 'emoji', () => (rte.emojiOpen = false))"
             >
-              <div data-rte-own class="rte-picker-tabs" role="tablist" aria-label="表情分类">
-                <button data-rte-own
-                  v-for="cat in rte.RTE_EMOJI_CATEGORIES"
-                  :key="'em-tab-' + cat.id"
-                  type="button"
-                  role="tab"
-                  class="rte-picker-tab"
-                  :class="{ active: rte.emojiTabId === cat.id }"
-                  :aria-selected="rte.emojiTabId === cat.id"
-                  @click.stop="rte.emojiTabId = cat.id"
-                >{{ cat.label }}</button>
-              </div>
-              <div data-rte-own
-                class="rte-picker-grid rte-emoji-grid"
-                :class="{ 'rte-emoji-grid--large': rte.isLargeEmojiTab, 'rte-emoji-grid--kaomoji': rte.isKaomojiTab }"
-                role="tabpanel"
-              >
-                <button data-rte-own
-                  v-for="em in rte.activeEmojiList"
-                  :key="'em-' + rte.emojiTabId + '-' + em"
-                  type="button"
-                  class="rte-emoji-btn"
-                  :class="{ 'rte-emoji-btn--kaomoji': rte.isKaomojiTab || em.includes('(') || em.includes('¯') || em.includes('∠') }"
-                  :title="em"
-                  @click="rte.insertEmoji(em)"
-                >{{ em }}</button>
-              </div>
+              <RteEmojiPicker
+                :tab-id="rte.emojiTabId"
+                @update:tab-id="rte.emojiTabId = $event"
+                @select="rte.insertEmoji($event)"
+              />
             </div>
           </Teleport>
         </div>
@@ -1339,13 +1769,15 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('specialChars', el)"
             data-rte-anchor="specialChars"
             :class="{ active: rte.specialCharsOpen }"
-            title="字符"
+            aria-haspopup="dialog"
+            :aria-expanded="rte.specialCharsOpen"
+            :title="rte.specialCharsOpen ? undefined : t.title || '符号'"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.closeFontMenus(); rte.emojiOpen = false; rte.specialCharsOpen = !rte.specialCharsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('specialChars')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">字符<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ t.label || '符号' }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1356,28 +1788,11 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('specialChars')"
               @mouseleave="rte.onToolMenuLeave($event, 'specialChars', () => (rte.specialCharsOpen = false))"
             >
-              <div data-rte-own class="rte-picker-tabs" role="tablist" aria-label="字符分类">
-                <button data-rte-own
-                  v-for="cat in rte.RTE_SPECIAL_CHAR_CATEGORIES"
-                  :key="'sc-tab-' + cat.id"
-                  type="button"
-                  role="tab"
-                  class="rte-picker-tab"
-                  :class="{ active: rte.specialCharTabId === cat.id }"
-                  :aria-selected="rte.specialCharTabId === cat.id"
-                  @click.stop="rte.specialCharTabId = cat.id"
-                >{{ cat.label }}</button>
-              </div>
-              <div data-rte-own class="rte-picker-grid rte-specialchars-grid" role="tabpanel">
-                <button data-rte-own
-                  v-for="ch in rte.activeSpecialCharList"
-                  :key="'sc-' + rte.specialCharTabId + '-' + ch"
-                  type="button"
-                  class="rte-specialchars-btn"
-                  :title="ch"
-                  @click="rte.insertSpecialChar(ch)"
-                >{{ ch }}</button>
-              </div>
+              <RteSpecialCharsPicker
+                :tab-id="rte.specialCharTabId"
+                @update:tab-id="rte.specialCharTabId = $event"
+                @select="rte.insertSpecialChar($event)"
+              />
             </div>
           </Teleport>
         </div>
@@ -1393,7 +1808,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('columns', el)"
             data-rte-anchor="columns"
             :class="{ active: rte.columnsOpen || rte.isActive('columns') }"
-            title="多栏布局（2–6 栏）"
+            :title="t.title || '把内容分成多栏'"
             @click.stop="rte.markToolbarMenuOpening(); rte.columnsOpen = !rte.columnsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1416,10 +1831,9 @@ function toggleChartGroupMenu(key: string) {
                 <button data-rte-own
                   v-else
                   type="button"
+                  :title="toolbarMenuItemTitle(it.label) || undefined"
                   @click="rte.insertColumns(it.cols, it.ratios)"
-                >
-                  {{ it.label }}
-                </button>
+                ><RteMenuGlyph :label="it.label" fallback="columns" />{{ it.label }}</button>
               </template>
             </div>
           </Teleport>
@@ -1436,7 +1850,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('spacing', el)"
             data-rte-anchor="spacing"
             :class="{ active: rte.spacingOpen || !!(rte.currentLetterSpacing() || rte.currentMarginTop() || rte.currentMarginBottom()) }"
-            title="段前段后 / 字间距"
+            :title="t.title || toolbarActionTitle('spacing-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.spacingOpen = !rte.spacingOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1480,13 +1894,13 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('paraStyle', el)"
             data-rte-anchor="paraStyle"
             :class="{ active: rte.paraStyleOpen }"
-            title="段落样式集"
+            :title="t.title || toolbarActionTitle('para-style-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.paraStyleOpen = !rte.paraStyleOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('fontSize')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">段样式</span>
+            <span data-rte-own class="rte-tool-label">段样式<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1499,11 +1913,9 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.PARA_STYLE_OPTIONS"
                 :key="'ps-' + opt.id"
                 type="button"
+                :title="toolbarMenuItemTitle(opt.label) || opt.desc"
                 @click="rte.applyParaStyleId(opt.id)"
-              >
-                {{ opt.label }}
-                <span data-rte-own class="rte-menu-desc">{{ opt.desc }}</span>
-              </button>
+              ><RteMenuGlyph :id="opt.id" :label="opt.label" /><span data-rte-own>{{ opt.label }}</span><span data-rte-own class="rte-menu-desc">{{ opt.desc }}</span></button>
             </div>
           </Teleport>
         </div>
@@ -1519,13 +1931,13 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('listStyle', el)"
             data-rte-anchor="listStyle"
             :class="{ active: rte.listStyleOpen }"
-            title="列表编号样式"
+            :title="t.title || toolbarActionTitle('list-style-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.listStyleOpen = !rte.listStyleOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('list')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">编号样式</span>
+            <span data-rte-own class="rte-tool-label">编号样式<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1538,12 +1950,13 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.ORDERED_LIST_STYLE_OPTIONS"
                 :key="'ls-' + opt.value"
                 type="button"
+                :class="{ active: rte.currentOrderedListStyle() === opt.value }"
+                :aria-pressed="rte.currentOrderedListStyle() === opt.value"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="rte.applyListStyle(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :id="opt.value" :label="opt.label" />{{ opt.label }}</button>
               <div data-rte-own class="rte-menu-sep" />
-              <button data-rte-own type="button" @click="rte.applyListStart()">自定义起始…</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('自定义起始…')" @click="rte.applyListStart()"><RteMenuGlyph label="自定义起始…" />自定义起始…</button>
             </div>
           </Teleport>
         </div>
@@ -1553,13 +1966,17 @@ function toggleChartGroupMenu(key: string) {
           @mouseenter="rte.onToolMenuEnter('wordStats')"
           @mouseleave="rte.onToolMenuLeave($event, 'wordStats', () => (rte.wordStatsOpen = false))"
         >
+          <!-- 面板打开时撤掉原生 title：否则浏览器 tooltip 会盖在面板标题上 -->
           <button data-rte-own
             type="button"
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('wordStats', el)"
             data-rte-anchor="wordStats"
             :class="{ active: rte.wordStatsOpen }"
-            title="字数统计"
+            aria-label="字数统计"
+            aria-haspopup="dialog"
+            :aria-expanded="rte.wordStatsOpen"
+            :title="rte.wordStatsOpen ? undefined : t.title || toolbarActionTitle('word-stats-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.wordStatsOpen = !rte.wordStatsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1576,26 +1993,7 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('wordStats')"
               @mouseleave="rte.onToolMenuLeave($event, 'wordStats', () => (rte.wordStatsOpen = false))"
             >
-              <div data-rte-own class="rte-wordstats-title">字数统计</div>
-              <p data-rte-own class="rte-wordstats-note">全文含标题、表格和代码中的文字，不含评论。</p>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>全文（去空白）</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>词数（估）</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>阅读约</span><strong data-rte-own>{{ rte.readingMinutes }} 分钟</strong></div>
-              <div data-rte-own class="rte-wordstats-divider" />
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>行数</span><strong data-rte-own>{{ rte.docExtraStats.lines }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>标题数</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>汉字</span><strong data-rte-own>{{ rte.docExtraStats.cjk }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.docExtraStats.asciiWords }}</strong></div>
-              <div data-rte-own class="rte-wordstats-divider" />
-              <div data-rte-own class="rte-wordstats-row">
-                <span data-rte-own>选区字符</span>
-                <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.chars : '—' }}</strong>
-              </div>
-              <div data-rte-own class="rte-wordstats-row">
-                <span data-rte-own>选区词数</span>
-                <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.words : '—' }}</strong>
-              </div>
+              <RteWordStatsPanel v-bind="wordStatsPanelProps" @close="rte.wordStatsOpen = false" />
             </div>
           </Teleport>
         </div>
@@ -1611,7 +2009,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('callout', el)"
             data-rte-anchor="callout"
             :class="{ active: rte.calloutOpen || rte.isActive('callout') }"
-            title="告示框（提示/警告/成功/错误）"
+            :title="t.title || '告示'"
             aria-label="告示框"
             @click.stop="rte.markToolbarMenuOpening(); rte.calloutOpen = !rte.calloutOpen"
           >
@@ -1635,6 +2033,8 @@ function toggleChartGroupMenu(key: string) {
                 :key="'co-' + it.variant"
                 type="button"
                 :class="{ active: rte.isActive('callout', { variant: it.variant }) }"
+                :aria-pressed="rte.isActive('callout', { variant: it.variant })"
+                :title="blockMenuTitle('callout-' + it.variant) || undefined"
                 @click="rte.insertCallout(it.variant)"
               >
                 <span data-rte-own class="rte-callout-dot" :data-variant="it.variant" aria-hidden="true" />
@@ -1645,6 +2045,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 :disabled="!rte.isActive('callout')"
+                :title="toolbarMenuItemTitle('取消告示框')"
                 @click="rte.editor?.chain().focus().unsetCallout().run(); rte.calloutOpen = false"
               >
                 取消告示框
@@ -1664,8 +2065,10 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('shortcuts', el)"
             data-rte-anchor="shortcuts"
             :class="{ active: rte.shortcutsOpen }"
-            title="快捷键速查"
-            aria-label="快捷键速查"
+            :title="t.title || '查看全部快捷键'"
+            :aria-label="t.title || '查看全部快捷键'"
+            aria-haspopup="menu"
+            :aria-expanded="rte.shortcutsOpen"
             @click.stop="rte.toggleShortcutsPanel()"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1690,7 +2093,10 @@ function toggleChartGroupMenu(key: string) {
                 v-model="rte.shortcutQuery"
                 class="rte-shortcuts-search"
                 type="search"
+            autocomplete="off"
+            spellcheck="false"
                 placeholder="搜索，例如 bold、引用、tab"
+                :title="toolbarActionTitle('shortcut-find')"
                 aria-label="搜索快捷键"
                 @mousedown.stop
                 @keydown.stop
@@ -1726,7 +2132,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('hr', el)"
             data-rte-anchor="hr"
             :class="{ active: rte.hrOpen || rte.isActive('horizontalRule') }"
-            title="分割线（也可输入 ---）"
+            :title="t.title || '分割线'"
             aria-label="分割线"
             aria-haspopup="menu"
             :aria-expanded="rte.hrOpen"
@@ -1750,13 +2156,13 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('blockOps', el)"
             data-rte-anchor="blockOps"
             :class="{ active: rte.blockOpsOpen }"
-            title="块操作"
+            :title="t.title || '块操作'"
             @click.stop="rte.markToolbarMenuOpening(); rte.blockOpsOpen = !rte.blockOpsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('more')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">块<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ t.label || '块操作' }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
         </div>
         <div data-rte-own
@@ -1771,7 +2177,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('insertDate', el)"
             data-rte-anchor="insertDate"
             :class="{ active: rte.insertDateOpen }"
-            title="插入日期"
+            :title="t.title || '插入日期'"
             @click.stop="rte.markToolbarMenuOpening(); rte.insertDateOpen = !rte.insertDateOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1818,37 +2224,17 @@ function toggleChartGroupMenu(key: string) {
               @mouseleave="rte.onToolMenuLeave($event, t.key, () => (rte.echartsGroupMenuKey = null))"
             >
               <!-- 只列本分类下的具体图表类型 -->
-              <div data-rte-own class="rte-menu-section">{{ t.title || t.label }}</div>
-              <template v-for="cat in chartCategoriesOf(chartGroupIdOfTool(t.key))" :key="'cat-' + cat.id">
-                <button
-                  data-rte-own
-                  type="button"
-                  class="rte-menu-cat"
-                  :class="{ 'is-open': rte.echartsOpenCategory === cat.id }"
-                  @click="rte.toggleEchartsCategory(cat.id)"
-                >
-                  <strong data-rte-own>{{ cat.label }}</strong>
-                  <span data-rte-own class="rte-menu-hint">{{ cat.templates.length }} 种</span>
-                </button>
-                <div
-                  v-if="rte.echartsOpenCategory === cat.id"
-                  data-rte-own
-                  class="rte-menu-sub"
-                >
-                  <button
-                    v-for="tpl in cat.templates"
-                    :key="'tpl-' + tpl.id"
-                    data-rte-own
-                    type="button"
-                    @click="rte.insertEchartsTemplateById(tpl.id)"
-                  >
-                    {{ tpl.label }}
-                    <span data-rte-own class="rte-menu-hint">{{ tpl.hint }}</span>
-                  </button>
-                </div>
-              </template>
-              <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
-              <button data-rte-own type="button" @click="rte.openEchartsDialog()">一键生成…</button>
+              <RteChartGroupMenu
+                variant="float"
+                :group-id="chartGroupIdOfTool(t.key)"
+                :title="chartGroupTitle(t.key)"
+                :hint="chartGroupHint(t.key)"
+                :categories="chartCategoriesOf(chartGroupIdOfTool(t.key))"
+                :open-category-id="rte.echartsOpenCategory"
+                @toggle-category="rte.toggleEchartsCategory"
+                @insert-template="rte.insertEchartsTemplateById"
+                @open-generator="rte.openEchartsDialog()"
+              />
             </div>
           </Teleport>
         </div>
@@ -1888,10 +2274,9 @@ function toggleChartGroupMenu(key: string) {
                   data-rte-own
                   type="button"
                   :class="{ active: rte.textMenuActive(item.id) }"
+                  :title="toolbarMenuItemTitle(item.label) || undefined"
                   @click="rte.runTextMenu(item.id)"
-                >
-                  {{ item.label }}
-                </button>
+                ><RteMenuGlyph :id="item.id" :label="item.label" />{{ item.label }}</button>
               </template>
             </div>
           </Teleport>
@@ -1908,13 +2293,13 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('zoom', el)"
             data-rte-anchor="zoom"
             :class="{ active: rte.zoomMenuOpen || rte.editorZoom !== 1 }"
-            title="编辑区缩放"
+            :title="zoomToolTitle(rte.editorZoom)"
             @click.stop="rte.markToolbarMenuOpening(); rte.zoomMenuOpen = !rte.zoomMenuOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('wordStats')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">{{ Math.round(rte.editorZoom * 100) }}%<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ zoomToolLabel(rte.editorZoom) }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1930,10 +2315,10 @@ function toggleChartGroupMenu(key: string) {
                 :key="'z-' + z.value"
                 type="button"
                 :class="{ active: rte.editorZoom === z.value }"
+                :aria-pressed="rte.editorZoom === z.value"
+                :title="toolbarMenuItemTitle(z.label) || undefined"
                 @click="rte.setEditorZoom(z.value)"
-              >
-                {{ z.label }}
-              </button>
+              ><RteMenuGlyph :label="z.label" fallback="zoom" />{{ z.label }}</button>
             </div>
           </Teleport>
         </div>
@@ -1949,7 +2334,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('viewExtras', el)"
             data-rte-anchor="viewExtras"
             :class="{ active: rte.viewExtrasOpen || rte.focusMode || rte.darkEditor || rte.paperGuide || rte.pageSize !== 'full' }"
-            :title="`视图 · ${rte.pageSizeMeta.label}`"
+            :title="(t.title || '视图') + '。当前纸张：' + rte.pageSizeMeta.label"
             aria-haspopup="menu"
             :aria-expanded="rte.viewExtrasOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.viewExtrasOpen = !rte.viewExtrasOpen"
@@ -1968,9 +2353,9 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('viewExtras')"
               @mouseleave="rte.onToolMenuLeave($event, 'viewExtras', () => (rte.viewExtrasOpen = false))"
             >
-              <button data-rte-own type="button" :class="{ active: rte.focusMode }" @click="rte.toggleFocusMode">专注模式</button>
-              <button data-rte-own type="button" :class="{ active: rte.darkEditor }" @click="rte.toggleDarkEditor">暗色编辑区</button>
-              <button data-rte-own type="button" :class="{ active: rte.paperGuide }" @click="rte.togglePaperGuide">纸张参考线</button>
+              <button data-rte-own type="button" :class="{ active: rte.focusMode }" :aria-pressed="rte.focusMode" @click="rte.toggleFocusMode"><RteMenuGlyph label="专注模式" />专注模式</button>
+              <button data-rte-own type="button" :class="{ active: rte.darkEditor }" :aria-pressed="rte.darkEditor" @click="rte.toggleDarkEditor"><RteMenuGlyph label="暗色编辑区" />暗色编辑区</button>
+              <button data-rte-own type="button" :class="{ active: rte.paperGuide }" :aria-pressed="rte.paperGuide" @click="rte.togglePaperGuide"><RteMenuGlyph label="纸张参考线" />纸张参考线</button>
               <template data-rte-own v-if="rte.pageSheetEnabled">
                 <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
                 <div data-rte-own class="rte-page-size-label">页面大小</div>
@@ -1981,12 +2366,9 @@ function toggleChartGroupMenu(key: string) {
                   role="menuitemradio"
                   :aria-checked="rte.pageSize === opt.id"
                   :class="{ active: rte.pageSize === opt.id }"
-                  :title="opt.hint"
+                  :title="pageSizeTitle(opt.id) || opt.hint"
                   @click="rte.setPageSize(opt.id)"
-                >
-                  {{ opt.label }}
-                  <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
-                </button>
+                ><RteMenuGlyph :id="opt.id" :label="opt.label" fallback="page" />{{ opt.label }}<span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span></button>
               </template>
             </div>
           </Teleport>
@@ -2003,13 +2385,15 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('textTidy', el)"
             data-rte-anchor="textTidy"
             :class="{ active: rte.textTidyOpen }"
-            title="整理选中文字"
+            :title="t.title || '整理'"
             aria-label="整理文字"
             aria-haspopup="menu"
             :aria-expanded="rte.textTidyOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.textTidyOpen = !rte.textTidyOpen"
           >
-            <span data-rte-own class="rte-tool-icon">理</span>
+            <span data-rte-own class="rte-tool-icon">
+              <component data-rte-own :is="rte.toolIcon('tidy')" class="rte-ep-icon" />
+            </span>
             <span data-rte-own class="rte-tool-label">整理<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
@@ -2025,10 +2409,9 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.TEXT_TIDY_ACTIONS"
                 :key="'tidy-' + opt.id"
                 type="button"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="rte.runTextMenu(opt.id); rte.textTidyOpen = false"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}</button>
             </div>
           </Teleport>
         </div>
@@ -2044,7 +2427,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('imageLayout', el)"
             data-rte-anchor="imageLayout"
             :class="{ active: rte.imageLayoutOpen || rte.isImageNodeSelected() }"
-            title="图片排法：居中、居左、居右、左右环绕"
+            :title="disabledToolTitle('图片排法：居中、居左、居右、左右环绕', !rte.isImageNodeSelected())"
             aria-label="图片排法"
             aria-haspopup="menu"
             :aria-expanded="rte.imageLayoutOpen"
@@ -2069,10 +2452,10 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.IMAGE_LAYOUT_OPTIONS"
                 :key="'img-layout-' + opt.id"
                 type="button"
+                :class="{ active: imageLayoutSelected(opt) }"
+                :aria-pressed="imageLayoutSelected(opt)"
                 @click="rte.setImagePlacement(opt); rte.imageLayoutOpen = false"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}</button>
             </div>
           </Teleport>
         </div>
@@ -2088,13 +2471,14 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor(t.key, el)"
             :data-rte-anchor="t.key"
             :class="{ active: rte.presetMenuKey === t.key || !!t.active?.() }"
-            :title="t.title || t.label"
+            :title="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
             :aria-label="t.title || t.label"
+            :aria-keyshortcuts="shortcutFromTitle(t.title || '') || undefined"
             aria-haspopup="menu"
             :aria-expanded="rte.presetMenuKey === t.key"
             :disabled="t.disabled?.() || undefined"
             @mousedown.prevent
-            @click.stop="rte.markToolbarMenuOpening(); rte.togglePresetMenu(t.key)"
+            @click.stop="rte.markToolbarMenuOpening(); rte.openPresetMenu(t.key)"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own v-if="t.iconComp" :is="t.iconComp" class="rte-ep-icon" />
@@ -2115,20 +2499,46 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in t.presetOptions"
                 :key="t.key + '-' + opt.label"
                 type="button"
+                :class="{ active: (t.currentPreset?.() || '') === opt.id }"
+                :aria-pressed="(t.currentPreset?.() || '') === opt.id"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="t.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
-                {{ opt.label }}
+                <RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}
               </button>
             </div>
           </Teleport>
+        </div>
+        <div data-rte-own
+          v-else-if="t.kind === 'paperGroup'"
+          class="rte-paper-group"
+          role="group"
+          aria-label="纸样"
+        >
+          <button data-rte-own
+            v-for="opt in t.presetOptions"
+            :key="t.key + '-' + (opt.id || 'default')"
+            type="button"
+            class="rte-paper-chip"
+            :class="{ active: (t.currentPreset?.() || '') === opt.id }"
+            :aria-pressed="(t.currentPreset?.() || '') === opt.id"
+            :title="toolbarMenuItemTitle(opt.label) || (opt.label + '纸样')"
+            @mousedown.prevent
+            @click="t.applyPreset?.(opt.id)"
+          >
+            <span data-rte-own class="rte-paper-swatch" :data-paper="opt.id || 'default'" aria-hidden="true" />
+            <span data-rte-own class="rte-paper-chip-label">{{ opt.label }}</span>
+          </button>
         </div>
         <button data-rte-own
           v-else
           type="button"
           class="rte-tool"
           :class="{ active: t.active?.(), 'is-disabled': t.disabled?.() }"
-          :title="t.title || t.label"
+          :data-tip="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
+          :title="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
           :aria-label="t.title || t.label"
+          :aria-keyshortcuts="shortcutFromTitle(t.title || '') || undefined"
           :aria-pressed="t.active ? !!t.active() : undefined"
           :disabled="t.disabled?.() || undefined"
           @mousedown.prevent
@@ -2150,7 +2560,7 @@ function toggleChartGroupMenu(key: string) {
 
       <!-- 未最大化：其余工具收进「更多」 -->
       <div data-rte-own
-        v-if="!rte.expanded && rte.moreTools.length"
+        v-if="!rte.expanded && rte.moreTools.length && !rte.toolbarQuery"
         class="rte-tool-wrap rte-more-wrap"
         @mouseenter="rte.onToolMenuEnter('more')"
         @mouseleave="rte.onToolMenuLeave($event, 'more', rte.closeMore)"
@@ -2160,27 +2570,61 @@ function toggleChartGroupMenu(key: string) {
           class="rte-tool is-labeled"
           :ref="(el) => rte.setFloatAnchor('more', el)" data-rte-anchor="more"
           :class="{ active: rte.moreOpen }"
-          title="更多格式与插入"
-          aria-label="更多格式与插入"
+          :title="moreToolsTitle(rte.moreTools.length)"
+          :aria-label="moreToolsTitle(rte.moreTools.length)"
           aria-haspopup="menu"
           :aria-expanded="rte.moreOpen"
           @click.stop="rte.markToolbarMenuOpening(); rte.moreOpen = !rte.moreOpen"
+          @keydown="onMoreButtonKeydown"
         >
           <span data-rte-own class="rte-tool-icon">
             <component data-rte-own :is="rte.toolIcon('more')" class="rte-ep-icon" />
           </span>
-          <span data-rte-own class="rte-tool-label">更多</span>
+          <span data-rte-own class="rte-tool-label">{{ moreToolsCaption(rte.moreTools.length) }}</span>
         </button>
         <Teleport to="body">
           <div data-rte-own
             v-if="rte.moreOpen"
             class="rte-more-menu"
             v-rte-float="'more'"
-            :class="{ 'has-flyout': rte.moreColorOpen || rte.moreHighlightOpen || rte.moreFormOpen || rte.moreTemplateOpen || rte.moreFontSizeOpen || rte.moreFontFamilyOpen || rte.moreLineHeightOpen || rte.moreCalloutOpen || !!rte.presetMenuKey }"
+            :class="{ 'is-tg': rte.tgStyle, 'has-flyout': rte.moreColorOpen || rte.moreHighlightOpen || rte.moreFormOpen || rte.moreTemplateOpen || rte.moreFontSizeOpen || rte.moreFontFamilyOpen || rte.moreLineHeightOpen || rte.moreCalloutOpen || !!rte.presetMenuKey }"
             @mousedown.prevent
+            @keydown="onMoreMenuKeydown"
             @mouseenter="rte.onToolMenuEnter('more')"
             @mouseleave="rte.onToolMenuLeave($event, 'more', rte.closeMore)"
           >
+          <div data-rte-own class="rte-more-settings">
+            <button data-rte-own
+              type="button"
+              class="rte-more-settings-toggle"
+              :class="{ active: showToolbarSettings }"
+              :aria-expanded="showToolbarSettings"
+              title="工具栏设置：分组内按钮的显示与顺序"
+              @click.stop="showToolbarSettings = !showToolbarSettings"
+            >
+              <span data-rte-own class="rte-more-settings-glyph" aria-hidden="true">⚙</span>
+              <span data-rte-own>工具栏设置</span>
+              <span data-rte-own class="rte-more-settings-caret" aria-hidden="true">{{ showToolbarSettings ? '▴' : '▾' }}</span>
+            </button>
+            <p data-rte-own class="rte-more-settings-hint">按分组调整按钮的显示与顺序；分组本身可拖动手柄排序。</p>
+            <div data-rte-own v-if="showToolbarSettings" class="rte-more-settings-list">
+              <div data-rte-own
+                v-for="group in rte.moreGroups"
+                :key="'ts-' + group.id"
+                class="rte-more-settings-row"
+              >
+                <span data-rte-own class="rte-more-settings-name">{{ group.label }}</span>
+                <span data-rte-own class="rte-more-settings-count">{{ group.tools.length }}</span>
+                <button data-rte-own
+                  type="button"
+                  class="rte-more-settings-btn"
+                  :title="'自定义' + group.label + '的按钮'"
+                  :aria-label="'自定义' + group.label + '的按钮'"
+                  @click.stop="onGroupContextMenu(group.id, $event)"
+                >⚙</button>
+              </div>
+            </div>
+          </div>
           <div data-rte-own
             v-for="group in rte.moreGroups"
             :key="group.id"
@@ -2197,7 +2641,7 @@ function toggleChartGroupMenu(key: string) {
               class="rte-more-capsule"
               draggable="false"
               :aria-label="'拖动' + group.label + '分组'"
-              title="拖动整组"
+              :title="groupHandleTitle(group.label, group.tools.length)"
               @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
               @pointermove="rte.onToolbarHandlePointerMove"
               @pointerup="rte.onToolbarHandlePointerUp"
@@ -2206,8 +2650,38 @@ function toggleChartGroupMenu(key: string) {
             >
               ⠿ {{ group.label }}
             </button>
-            <template v-for="mt in group.tools" :key="mt.key">
             <button data-rte-own
+              v-if="rte.viewMode === 'edit'"
+              type="button"
+              class="rte-more-group-settings"
+              :title="'自定义' + group.label + '的按钮'"
+              :aria-label="'自定义' + group.label + '的按钮'"
+              @click.stop="onGroupContextMenu(group.id, $event)"
+            >⚙</button>
+            <template v-for="mt in group.tools" :key="mt.key">
+            <div data-rte-own
+              v-if="mt.kind === 'paperGroup'"
+              class="rte-paper-group rte-paper-group--menu"
+              role="group"
+              aria-label="纸样"
+            >
+              <button data-rte-own
+                v-for="opt in mt.presetOptions"
+                :key="'mpaper-' + (opt.id || 'default')"
+                type="button"
+                class="rte-paper-chip"
+                :class="{ active: (mt.currentPreset?.() || '') === opt.id }"
+                :aria-pressed="(mt.currentPreset?.() || '') === opt.id"
+                :title="toolbarMenuItemTitle(opt.label) || (opt.label + '纸样')"
+                @mousedown.prevent
+                @click="mt.applyPreset?.(opt.id)"
+              >
+                <span data-rte-own class="rte-paper-swatch" :data-paper="opt.id || 'default'" aria-hidden="true" />
+                <span data-rte-own class="rte-paper-chip-label">{{ opt.label }}</span>
+              </button>
+            </div>
+            <button data-rte-own
+              v-else
               type="button"
               class="rte-more-item"
               @mouseenter="rte.hoverMoreSubmenu(mt)"
@@ -2223,6 +2697,12 @@ function toggleChartGroupMenu(key: string) {
                   (mt.kind === 'fontFamily' && rte.moreFontFamilyOpen) ||
                   (mt.kind === 'lineHeight' && rte.moreLineHeightOpen),
               }"
+              :data-tool-key="mt.key"
+              :data-tip="disabledToolTitle(mt.title || mt.label, !!mt.disabled?.())"
+              :title="disabledToolTitle(mt.title || mt.label, !!mt.disabled?.())"
+              :aria-keyshortcuts="shortcutFromTitle(mt.title || '') || undefined"
+              :aria-pressed="mt.active ? !!mt.active() : undefined"
+              :disabled="mt.disabled?.() || undefined"
               @click="rte.onMoreToolClick(mt)"
             >
               <span data-rte-own class="rte-more-icon">
@@ -2233,9 +2713,10 @@ function toggleChartGroupMenu(key: string) {
                 />
                 <template v-else>{{ mt.icon }}</template>
               </span>
-              <span data-rte-own>{{ mt.title || mt.label }}</span>
+              <span data-rte-own>{{ mt.label }}</span>
+              <span v-if="shortcutFromTitle(mt.title || '')" data-rte-own class="rte-more-kbd">{{ shortcutFromTitle(mt.title || '') }}</span>
               <span data-rte-own
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup' || mt.kind === 'imageLayout' || mt.kind === 'textTidy' || mt.kind === 'presetMenu'"
+                v-if="mt.kind === 'attach' || menuToolNeedsCaret(mt.kind)"
                 class="rte-more-caret"
               >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>
@@ -2245,34 +2726,17 @@ function toggleChartGroupMenu(key: string) {
               @mousedown.prevent
             >
               <!-- 紧凑态「更多」里的一级分类下拉：窄屏也能找到 9 个图表分类 -->
-              <div data-rte-own class="rte-menu-section">{{ mt.title || mt.label }}</div>
-              <template v-for="cat in chartCategoriesOf(chartGroupIdOfTool(mt.key))" :key="'mcat-' + cat.id">
-                <button data-rte-own
-                  type="button"
-                  class="rte-menu-cat"
-                  :class="{ 'is-open': rte.echartsOpenCategory === cat.id }"
-                  @click="rte.toggleEchartsCategory(cat.id)"
-                >
-                  <strong data-rte-own>{{ cat.label }}</strong>
-                  <span data-rte-own class="rte-menu-hint">{{ cat.templates.length }} 种</span>
-                </button>
-                <div data-rte-own
-                  v-if="rte.echartsOpenCategory === cat.id"
-                  class="rte-menu-sub"
-                >
-                  <button data-rte-own
-                    v-for="tpl in cat.templates"
-                    :key="'mtpl-' + tpl.id"
-                    type="button"
-                    @click="rte.insertEchartsTemplateById(tpl.id)"
-                  >
-                    {{ tpl.label }}
-                    <span data-rte-own class="rte-menu-hint">{{ tpl.hint }}</span>
-                  </button>
-                </div>
-              </template>
-              <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
-              <button data-rte-own type="button" @click="rte.openEchartsDialog()">一键生成…</button>
+              <RteChartGroupMenu
+                variant="inline"
+                :group-id="chartGroupIdOfTool(mt.key)"
+                :title="chartGroupTitle(mt.key)"
+                :hint="chartGroupHint(mt.key)"
+                :categories="chartCategoriesOf(chartGroupIdOfTool(mt.key))"
+                :open-category-id="rte.echartsOpenCategory"
+                @toggle-category="rte.toggleEchartsCategory"
+                @insert-template="rte.insertEchartsTemplateById"
+                @open-generator="rte.openEchartsDialog()"
+              />
             </div>
             <div data-rte-own
               v-if="mt.kind === 'textTidy' && rte.textTidyOpen"
@@ -2283,10 +2747,9 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.TEXT_TIDY_ACTIONS"
                 :key="'mtidy-' + opt.id"
                 type="button"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="rte.runTextMenu(opt.id); rte.textTidyOpen = false"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'presetMenu' && rte.presetMenuKey === mt.key"
@@ -2297,9 +2760,12 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in mt.presetOptions"
                 :key="'mpreset-' + mt.key + '-' + opt.label"
                 type="button"
+                :class="{ active: (mt.currentPreset?.() || '') === opt.id }"
+                :aria-pressed="(mt.currentPreset?.() || '') === opt.id"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="mt.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
-                {{ opt.label }}
+                <RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}
               </button>
             </div>
             <div data-rte-own
@@ -2311,11 +2777,11 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.IMAGE_LAYOUT_OPTIONS"
                 :key="'mimg-' + opt.id"
                 type="button"
+                :class="{ active: imageLayoutSelected(opt) }"
+                :aria-pressed="imageLayoutSelected(opt)"
                 :disabled="!rte.isImageNodeSelected()"
                 @click="rte.setImagePlacement(opt); rte.imageLayoutOpen = false"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'fontSize' && rte.moreFontSizeOpen"
@@ -2327,19 +2793,17 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mfs-recent-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontSize() || '')"
                 @click="rte.applyFontSize(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :label="opt.label" fallback="fontSize" />{{ opt.label }}</button>
               <button data-rte-own
                 v-for="opt in rte.FONT_SIZE_OPTIONS"
                 :key="'mfs-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontSize() || '')"
                 @click="rte.applyFontSize(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :label="opt.label" fallback="fontSize" />{{ opt.label }}</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'fontFamily' && rte.moreFontFamilyOpen"
@@ -2351,11 +2815,10 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mff-' + (opt.value || 'default')"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontFamily() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontFamily() || '')"
                 :style="opt.value ? { fontFamily: opt.value } : undefined"
                 @click="rte.applyFontFamily(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :label="opt.label" fallback="fontFamily" />{{ opt.label }}</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'lineHeight' && rte.moreLineHeightOpen"
@@ -2367,10 +2830,9 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mlh-' + (opt.value || 'default')"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentLineHeight() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentLineHeight() || '')"
                 @click="rte.applyLineHeight(opt.value)"
-              >
-                {{ opt.label }}
-              </button>
+              ><RteMenuGlyph :label="opt.label" fallback="lineHeight" />{{ opt.label }}</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'caseTransform' && rte.caseMenuOpen"
@@ -2384,10 +2846,9 @@ function toggleChartGroupMenu(key: string) {
                   data-rte-own
                   type="button"
                   :class="{ active: rte.textMenuActive(item.id) }"
+                  :title="toolbarMenuItemTitle(item.label) || undefined"
                   @click="rte.runTextMenu(item.id)"
-                >
-                  {{ item.label }}
-                </button>
+                ><RteMenuGlyph :id="item.id" :label="item.label" />{{ item.label }}</button>
               </template>
             </div>
             <div data-rte-own
@@ -2400,19 +2861,19 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mz-' + z.value"
                 type="button"
                 :class="{ active: rte.editorZoom === z.value }"
+                :aria-pressed="rte.editorZoom === z.value"
+                :title="toolbarMenuItemTitle(z.label) || undefined"
                 @click="rte.setEditorZoom(z.value)"
-              >
-                {{ z.label }}
-              </button>
+              ><RteMenuGlyph :label="z.label" fallback="zoom" />{{ z.label }}</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'viewExtras' && rte.viewExtrasOpen"
               class="rte-menu rte-more-flyout"
               @mousedown.prevent
             >
-              <button data-rte-own type="button" :class="{ active: rte.focusMode }" @click="rte.toggleFocusMode">专注模式</button>
-              <button data-rte-own type="button" :class="{ active: rte.darkEditor }" @click="rte.toggleDarkEditor">暗色编辑区</button>
-              <button data-rte-own type="button" :class="{ active: rte.paperGuide }" @click="rte.togglePaperGuide">纸张参考线</button>
+              <button data-rte-own type="button" :class="{ active: rte.focusMode }" :aria-pressed="rte.focusMode" @click="rte.toggleFocusMode"><RteMenuGlyph label="专注模式" />专注模式</button>
+              <button data-rte-own type="button" :class="{ active: rte.darkEditor }" :aria-pressed="rte.darkEditor" @click="rte.toggleDarkEditor"><RteMenuGlyph label="暗色编辑区" />暗色编辑区</button>
+              <button data-rte-own type="button" :class="{ active: rte.paperGuide }" :aria-pressed="rte.paperGuide" @click="rte.togglePaperGuide"><RteMenuGlyph label="纸张参考线" />纸张参考线</button>
               <template data-rte-own v-if="rte.pageSheetEnabled">
                 <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
                 <div data-rte-own class="rte-page-size-label">页面大小</div>
@@ -2423,12 +2884,9 @@ function toggleChartGroupMenu(key: string) {
                   role="menuitemradio"
                   :aria-checked="rte.pageSize === opt.id"
                   :class="{ active: rte.pageSize === opt.id }"
-                  :title="opt.hint"
+                  :title="pageSizeTitle(opt.id) || opt.hint"
                   @click="rte.setPageSize(opt.id)"
-                >
-                  {{ opt.label }}
-                  <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
-                </button>
+                ><RteMenuGlyph :id="opt.id" :label="opt.label" fallback="page" />{{ opt.label }}<span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span></button>
               </template>
             </div>
             <div data-rte-own
@@ -2436,51 +2894,27 @@ function toggleChartGroupMenu(key: string) {
               class="rte-menu rte-more-flyout"
               @mousedown.prevent
             >
-              <button data-rte-own type="button" @click="rte.insertFormRadio()">单选组</button>
-              <button data-rte-own type="button" @click="rte.insertFormCheckbox()">多选组</button>
-              <button data-rte-own type="button" @click="rte.insertFormText()">文本输入</button>
-              <button data-rte-own type="button" @click="rte.insertFormTextarea()">多行文本</button>
-              <button data-rte-own type="button" @click="rte.insertFormNumber()">数字输入</button>
-              <button data-rte-own type="button" @click="rte.insertFormSelect()">下拉选择</button>
-              <button data-rte-own type="button" @click="rte.insertFormDate()">日期</button>
-              <button data-rte-own type="button" @click="rte.insertFormDateTime()">日期时间</button>
-              <button data-rte-own type="button" @click="rte.insertFormSwitch()">开关</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-radio')" @click="rte.insertFormRadio()"><RteMenuGlyph label="单选组" />单选组</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-check')" @click="rte.insertFormCheckbox()"><RteMenuGlyph label="多选组" />多选组</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-text')" @click="rte.insertFormText()"><RteMenuGlyph label="文本输入" />文本输入</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-textarea')" @click="rte.insertFormTextarea()"><RteMenuGlyph label="多行文本" />多行文本</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-number')" @click="rte.insertFormNumber()"><RteMenuGlyph label="数字输入" />数字输入</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-select')" @click="rte.insertFormSelect()"><RteMenuGlyph label="下拉选择" />下拉选择</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-date')" @click="rte.insertFormDate()"><RteMenuGlyph label="日期" />日期</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-datetime')" @click="rte.insertFormDateTime()"><RteMenuGlyph label="日期时间" />日期时间</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-switch')" @click="rte.insertFormSwitch()"><RteMenuGlyph label="开关" />开关</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.duplicateSelectedForm()">复制当前字段</button>
-              <button data-rte-own type="button" @click="rte.checkFormFields()">检查填写</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-duplicate')" @click="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('form-check-fill')" @click="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own
-                type="button"
-                @click="rte.moreFormOpen = false; rte.moreOpen = false; rte.openTableDialog()"
-              >
-                表格
-              </button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('table-size-dialog')" @click="rte.moreFormOpen = false; rte.moreOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'template' && rte.moreTemplateOpen"
               class="rte-menu rte-more-flyout rte-template-menu"
               @mousedown.prevent
             >
-              <div data-rte-own class="rte-template-menu-body">
-              <template v-for="g in rte.RTE_DOC_TEMPLATE_GROUPS" :key="'m-' + g.id">
-                <div data-rte-own class="rte-menu-section-label">{{ g.label }}</div>
-                <div data-rte-own class="rte-template-grid">
-                  <button data-rte-own
-                    v-for="tpl in rte.RTE_DOC_TEMPLATES.filter((x: any) => x.group === g.id)"
-                    :key="tpl.id"
-                    type="button"
-                    class="rte-template-item"
-                    :title="tpl.description || tpl.label"
-                    @click.stop="rte.insertDocTemplate(tpl.id)"
-                  >
-                    <span data-rte-own class="rte-template-item-label">{{ tpl.label }}</span>
-                    <span data-rte-own v-if="tpl.description" class="rte-template-item-desc">{{
-                      tpl.description
-                    }}</span>
-                  </button>
-                </div>
-              </template>
-              </div>
+              <RteTemplatePicker @select="rte.insertDocTemplate($event)" />
             </div>
             <div data-rte-own
               v-if="mt.kind === 'color' && rte.moreColorOpen"
@@ -2500,6 +2934,8 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mco-' + it.variant"
                 type="button"
                 :class="{ active: rte.isActive('callout', { variant: it.variant }) }"
+                :aria-pressed="rte.isActive('callout', { variant: it.variant })"
+                :title="blockMenuTitle('callout-' + it.variant) || undefined"
                 @click="rte.insertCallout(it.variant)"
               >
                 <span data-rte-own class="rte-callout-dot" :data-variant="it.variant" aria-hidden="true" />
@@ -2522,6 +2958,22 @@ function toggleChartGroupMenu(key: string) {
         </Teleport>
       </div>
 
+      <!-- 工具栏样式切换：Telegram 风格（紧凑图标条） / 完整功能区 -->
+      <div data-rte-own v-if="!rte.expanded" class="rte-tg-switch">
+        <button data-rte-own
+          type="button"
+          class="rte-tool rte-tg-switch-btn"
+          :title="rte.tgStyle ? '恢复标准工具栏样式' : '切换到 Telegram 风格工具栏'"
+          :aria-label="rte.tgStyle ? '恢复标准工具栏样式' : '切换到 Telegram 风格工具栏'"
+          :aria-pressed="rte.tgStyle"
+          @click.stop="rte.toggleTgStyle()"
+        >
+          <span data-rte-own class="rte-tool-icon">
+            <component data-rte-own :is="rte.toolIcon(rte.tgStyle ? 'ribbonStyle' : 'tgStyle')" class="rte-ep-icon" />
+          </span>
+        </button>
+      </div>
+
       <!-- 紧凑「更多」打开的浮层面板（顶栏无对应按钮时，锚到「更多」） -->
       <Teleport to="body">
         <div data-rte-own
@@ -2532,33 +2984,11 @@ function toggleChartGroupMenu(key: string) {
           @mouseenter="rte.onToolMenuEnter('emoji')"
           @mouseleave="rte.onToolMenuLeave($event, 'emoji', () => (rte.emojiOpen = false))"
         >
-          <div data-rte-own class="rte-picker-tabs" role="tablist" aria-label="表情分类">
-            <button data-rte-own
-              v-for="cat in rte.RTE_EMOJI_CATEGORIES"
-              :key="'c-em-tab-' + cat.id"
-              type="button"
-              role="tab"
-              class="rte-picker-tab"
-              :class="{ active: rte.emojiTabId === cat.id }"
-              :aria-selected="rte.emojiTabId === cat.id"
-              @click.stop="rte.emojiTabId = cat.id"
-            >{{ cat.label }}</button>
-          </div>
-          <div data-rte-own
-            class="rte-picker-grid rte-emoji-grid"
-            :class="{ 'rte-emoji-grid--large': rte.isLargeEmojiTab, 'rte-emoji-grid--kaomoji': rte.isKaomojiTab }"
-            role="tabpanel"
-          >
-            <button data-rte-own
-              v-for="em in rte.activeEmojiList"
-              :key="'c-em-' + rte.emojiTabId + '-' + em"
-              type="button"
-              class="rte-emoji-btn"
-              :class="{ 'rte-emoji-btn--kaomoji': rte.isKaomojiTab || em.includes('(') || em.includes('¯') || em.includes('∠') }"
-              :title="em"
-              @click="rte.insertEmoji(em)"
-            >{{ em }}</button>
-          </div>
+          <RteEmojiPicker
+            :tab-id="rte.emojiTabId"
+            @update:tab-id="rte.emojiTabId = $event"
+            @select="rte.insertEmoji($event)"
+          />
         </div>
       </Teleport>
       <Teleport to="body">
@@ -2570,28 +3000,11 @@ function toggleChartGroupMenu(key: string) {
           @mouseenter="rte.onToolMenuEnter('specialChars')"
           @mouseleave="rte.onToolMenuLeave($event, 'specialChars', () => (rte.specialCharsOpen = false))"
         >
-          <div data-rte-own class="rte-picker-tabs" role="tablist" aria-label="字符分类">
-            <button data-rte-own
-              v-for="cat in rte.RTE_SPECIAL_CHAR_CATEGORIES"
-              :key="'c-sc-tab-' + cat.id"
-              type="button"
-              role="tab"
-              class="rte-picker-tab"
-              :class="{ active: rte.specialCharTabId === cat.id }"
-              :aria-selected="rte.specialCharTabId === cat.id"
-              @click.stop="rte.specialCharTabId = cat.id"
-            >{{ cat.label }}</button>
-          </div>
-          <div data-rte-own class="rte-picker-grid rte-specialchars-grid" role="tabpanel">
-            <button data-rte-own
-              v-for="ch in rte.activeSpecialCharList"
-              :key="'c-sc-' + rte.specialCharTabId + '-' + ch"
-              type="button"
-              class="rte-specialchars-btn"
-              :title="ch"
-              @click="rte.insertSpecialChar(ch)"
-            >{{ ch }}</button>
-          </div>
+          <RteSpecialCharsPicker
+            :tab-id="rte.specialCharTabId"
+            @update:tab-id="rte.specialCharTabId = $event"
+            @select="rte.insertSpecialChar($event)"
+          />
         </div>
       </Teleport>
       <Teleport to="body">
@@ -2626,26 +3039,7 @@ function toggleChartGroupMenu(key: string) {
           @mouseenter="rte.onToolMenuEnter('wordStats')"
           @mouseleave="rte.onToolMenuLeave($event, 'wordStats', () => (rte.wordStatsOpen = false))"
         >
-          <div data-rte-own class="rte-wordstats-title">字数统计</div>
-          <p data-rte-own class="rte-wordstats-note">全文含标题、表格和代码中的文字，不含评论。</p>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>全文（去空白）</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>词数（估）</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>阅读约</span><strong data-rte-own>{{ rte.readingMinutes }} 分钟</strong></div>
-          <div data-rte-own class="rte-wordstats-divider" />
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>行数</span><strong data-rte-own>{{ rte.docExtraStats.lines }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>标题数</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>汉字</span><strong data-rte-own>{{ rte.docExtraStats.cjk }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.docExtraStats.asciiWords }}</strong></div>
-          <div data-rte-own class="rte-wordstats-divider" />
-          <div data-rte-own class="rte-wordstats-row">
-            <span data-rte-own>选区字符</span>
-            <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.chars : '—' }}</strong>
-          </div>
-          <div data-rte-own class="rte-wordstats-row">
-            <span data-rte-own>选区词数</span>
-            <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.words : '—' }}</strong>
-          </div>
+          <RteWordStatsPanel v-bind="wordStatsPanelProps" @close="rte.wordStatsOpen = false" />
         </div>
       </Teleport>
       <Teleport to="body">
@@ -2665,7 +3059,10 @@ function toggleChartGroupMenu(key: string) {
             v-model="rte.shortcutQuery"
             class="rte-shortcuts-search"
             type="search"
+            autocomplete="off"
+            spellcheck="false"
             placeholder="搜索，例如 bold、引用、tab"
+            :title="toolbarActionTitle('shortcut-find')"
             aria-label="搜索快捷键"
             @mousedown.stop
             @keydown.stop
@@ -2699,52 +3096,153 @@ function toggleChartGroupMenu(key: string) {
           aria-label="组内按钮"
           @mousedown.prevent
         >
-          <div data-rte-own class="rte-menu-section-label">
-            {{ (rte.visibleToolbarGroups.find((group) => group.id === rte.toolbarGroupButtonsGroupId) || {}).label || '本分组' }}
-            · 个性化设置
+          <div data-rte-own class="rte-menu-section-label rte-group-buttons-head">
+            <span>
+              {{ groupButtonLabel }} · 个性化设置
+            </span>
+            <span class="rte-group-buttons-count">
+              显示 {{ groupButtonVisibleCount }} / {{ groupButtonEntries.length }}
+            </span>
           </div>
-          <div data-rte-own
-            v-for="entry in rte.toolbarGroupButtonEntries(rte.toolbarGroupButtonsGroupId)"
-            :key="'gb-' + entry.key"
-            class="rte-group-button-row"
-          >
-            <label data-rte-own class="rte-group-button-check">
-              <input
+          <div data-rte-own class="rte-group-button-list">
+            <div
+              data-rte-own
+              v-for="entry in groupButtonEntries"
+              :key="'gb-' + entry.key"
+              class="rte-group-button-row"
+              :class="{ 'is-off': entry.hidden }"
+            >
+              <label data-rte-own class="rte-group-button-check">
+                <input
+                  data-rte-own
+                  type="checkbox"
+                  :checked="!entry.hidden"
+                  :aria-label="'显示' + entry.label"
+                  @change="rte.toggleToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key)"
+                />
+                <span data-rte-own>{{ entry.label }}</span>
+              </label>
+              <div
                 data-rte-own
-                type="checkbox"
-                :checked="!entry.hidden"
-                :aria-label="'显示' + entry.label"
-                @change="rte.toggleToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key)"
-              />
-              <span data-rte-own>{{ entry.label }}</span>
-            </label>
-            <button
-              data-rte-own
-              type="button"
-              class="rte-group-button-move"
-              :aria-label="'上移' + entry.label"
-              title="上移"
-              @click="rte.moveToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key, -1)"
-            >
-              ↑
-            </button>
-            <button
-              data-rte-own
-              type="button"
-              class="rte-group-button-move"
-              :aria-label="'下移' + entry.label"
-              title="下移"
-              @click="rte.moveToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key, 1)"
-            >
-              ↓
-            </button>
+                class="rte-group-button-ops"
+                tabindex="0"
+                role="group"
+                :aria-label="entry.label + ' 顺序调整'"
+                @keydown="onGroupButtonKeydown($event, entry)"
+              >
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-group-button-move"
+                  :disabled="!entry.canMoveUp"
+                  :aria-label="'把' + entry.label + '置顶'"
+                  :title="'把' + entry.label + '置顶'"
+                  @click="moveGroupButtonToEdge(entry, 'top')"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 3.2v9.6M8 3.2 4.6 6.6M8 3.2l3.4 3.4M3.4 12.8h9.2" />
+                  </svg>
+                </button>
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-group-button-move"
+                  :disabled="!entry.canMoveUp"
+                  :aria-label="'把' + entry.label + '上移一位'"
+                  :title="'把' + entry.label + '上移一位'"
+                  @click="moveGroupButtonBy(entry, -1)"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 12.8V3.2M8 12.8 4.6 9.4M8 12.8l3.4-3.4" />
+                  </svg>
+                </button>
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-group-button-move"
+                  :disabled="!entry.canMoveDown"
+                  :aria-label="'把' + entry.label + '下移一位'"
+                  :title="'把' + entry.label + '下移一位'"
+                  @click="moveGroupButtonBy(entry, 1)"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 3.2v9.6M8 12.8 4.6 9.4M8 12.8l3.4-3.4" />
+                  </svg>
+                </button>
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-group-button-move"
+                  :disabled="!entry.canMoveDown"
+                  :aria-label="'把' + entry.label + '置底'"
+                  :title="'把' + entry.label + '置底'"
+                  @click="moveGroupButtonToEdge(entry, 'bottom')"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 12.8V3.2M8 12.8l3.4-3.4M8 12.8 4.6 9.4M3.4 3.2h9.2" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" @click="rte.restoreToolbarGroupButtons(rte.toolbarGroupButtonsGroupId)">恢复本组默认</button>
-          <button data-rte-own type="button" @click="rte.closeToolbarGroupButtons()">完成</button>
+          <button data-rte-own type="button" :title="toolbarActionTitle('group-restore')" @click="rte.restoreToolbarGroupButtons(rte.toolbarGroupButtonsGroupId)">恢复本组默认</button>
+          <button data-rte-own type="button" :title="toolbarActionTitle('group-done')" @click="rte.closeToolbarGroupButtons()">完成</button>
         </div>
       </Teleport>
 
       </div>
+
+      <!-- 导出菜单会在任务开始后关闭；独立状态条保证长任务仍能查看进度并取消。 -->
+      <Teleport to="body">
+        <div
+          v-if="rte.exportBusy && (rte.exportStatus === 'running' || rte.exportStatus === 'cancelling')"
+          class="rte-export-progress"
+          role="status"
+          aria-live="polite"
+          data-rte-own
+        >
+          <div class="rte-export-progress__head" data-rte-own>
+            <span data-rte-own>{{ rte.exportStatus === 'cancelling' ? '正在取消…' : exportPhaseLabel() }}</span>
+            <span data-rte-own>{{ rte.exportProgress }}%</span>
+          </div>
+          <progress
+            class="rte-export-progress__bar"
+            :value="rte.exportProgress"
+            max="100"
+            :aria-label="exportPhaseLabel()"
+            data-rte-own
+          />
+          <button
+            type="button"
+            class="rte-export-progress__cancel"
+            :disabled="rte.exportStatus === 'cancelling'"
+            @click="rte.cancelExport"
+            data-rte-own
+          >取消导出</button>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div
+          v-if="tgTip"
+          data-rte-own
+          class="rte-tip"
+          :class="{ 'is-right': tgTip.align === 'right' }"
+          :style="{ left: tgTip.x + 'px', top: tgTip.y + 'px' }"
+          role="tooltip"
+        >{{ tgTip.text }}</div>
+      </Teleport>
+      <Teleport to="body">
+        <div
+          v-if="ribbonHint"
+          data-rte-own
+          class="rte-tip rte-ribbon-hint"
+          :style="{ left: ribbonHint.left + 'px', top: ribbonHint.top + 'px' }"
+          role="tooltip"
+        >
+          <strong class="rte-ribbon-hint__title">{{ ribbonHint.title }}</strong>
+          <span class="rte-ribbon-hint__desc">{{ ribbonHint.desc }}</span>
+        </div>
+      </Teleport>
     </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 import { EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
@@ -10,13 +10,53 @@ import RteImageLightbox from './RteImageLightbox.vue'
 import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
+import RteWordStatsPanel from './RteWordStatsPanel.vue'
 import { RTE_BINDINGS } from './bindings'
+import { blockHandleTitle, cropTitle, emptyGuideTitle, imagePlaceTitle, imageWidthTitle, toolbarMenuItemTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
+import { buildWordStatsPanelData } from '../../utils/rteWordStats'
+import {
+  BLOCK_PANEL_INSERT_SECTIONS,
+  BLOCK_PANEL_QUICK_ACTIONS,
+  BLOCK_PANEL_TURN_ACTIONS,
+  type BlockPanelEntry,
+} from '../../utils/rteBlockPanelMenu'
 import { useParentScopeStamp } from './inheritScope'
+import RteMenuGlyph from './RteMenuGlyph.vue'
+import { RTE_SLASH_ITEMS } from '../rteSlashItems'
 
-const rte = inject(RTE_BINDINGS)
+// 非空断言仅用于让闭包内的命令函数保留注入类型；下一行仍保留运行时防线。
+const rte = inject(RTE_BINDINGS)!
 if (!rte) throw new Error('RteDocumentBody 必须放在 RichTextEditor 里')
 const vRteFloat = rte.vRteFloat
 useParentScopeStamp()
+
+/** 字数面板数据（与工具栏下拉面板共用同一口径）。 */
+const wordStatsPanelProps = computed(() => buildWordStatsPanelData(rte))
+
+function findBlockSlashItem(id: string | undefined) {
+  if (!id) return undefined
+  return RTE_SLASH_ITEMS.find((item) => item.id === id)
+}
+
+function runBlockInsert(slashId: string | undefined) {
+  if (!slashId) return
+  const item = findBlockSlashItem(slashId)
+  if (item) rte.applyBlockInsertItem(item)
+}
+
+function runBlockQuickAction(action: BlockPanelEntry) {
+  if (action.turn) rte.turnHoveredBlock(action.turn)
+  else if (action.slashId) runBlockInsert(action.slashId)
+}
+
+function runBlockTurn(action: BlockPanelEntry) {
+  if (action.turn) rte.turnHoveredBlock(action.turn)
+}
+
+function blockInsertTitle(label: string, slashId: string | undefined): string {
+  const description = findBlockSlashItem(slashId)?.description
+  return description ? `${label}：${description}` : `插入${label}`
+}
 </script>
 
 <template>
@@ -40,8 +80,10 @@ useParentScopeStamp()
           :key="'hr2-' + opt.value"
           type="button"
           class="rte-hr-option"
+          :title="'插入一条' + opt.label"
           @click="rte.insertHrVariant(opt.value)"
         >
+          <RteMenuGlyph :id="opt.value" :label="opt.label" />
           <span data-rte-own class="rte-hr-preview" :data-variant="opt.value" aria-hidden="true" />
           <span data-rte-own>{{ opt.label }}</span>
         </button>
@@ -56,11 +98,11 @@ useParentScopeStamp()
         @mouseenter="rte.onToolMenuEnter('blockOps')"
         @mouseleave="rte.onToolMenuLeave($event, 'blockOps', () => (rte.blockOpsOpen = false))"
       >
-        <button data-rte-own type="button" @click="rte.selectCurrentBlock(); rte.blockOpsOpen = false">全选当前块</button>
-        <button data-rte-own type="button" @click="rte.duplicateCurrentBlock(); rte.blockOpsOpen = false">复制当前块</button>
+        <button data-rte-own type="button" title="选中光标所在的整段" @click="rte.selectCurrentBlock(); rte.blockOpsOpen = false"><RteMenuGlyph label="全选当前块" />全选当前块</button>
+        <button data-rte-own type="button" title="在下面再复制一份" @click="rte.duplicateCurrentBlock(); rte.blockOpsOpen = false"><RteMenuGlyph label="复制当前块" />复制当前块</button>
         <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-        <button data-rte-own type="button" @click="rte.moveCurrentBlock(-1); rte.blockOpsOpen = false">上移一块</button>
-        <button data-rte-own type="button" @click="rte.moveCurrentBlock(1); rte.blockOpsOpen = false">下移一块</button>
+        <button data-rte-own type="button" title="和上面一块交换位置" @click="rte.moveCurrentBlock(-1); rte.blockOpsOpen = false"><RteMenuGlyph label="上移一块" />上移一块</button>
+        <button data-rte-own type="button" title="和下面一块交换位置" @click="rte.moveCurrentBlock(1); rte.blockOpsOpen = false"><RteMenuGlyph label="下移一块" />下移一块</button>
       </div>
     </Teleport>
     <Teleport to="body">
@@ -72,8 +114,8 @@ useParentScopeStamp()
         @mouseenter="rte.onToolMenuEnter('insertDate')"
         @mouseleave="rte.onToolMenuLeave($event, 'insertDate', () => (rte.insertDateOpen = false))"
       >
-        <button data-rte-own type="button" @click="rte.insertPlainDate(); rte.insertDateOpen = false">今天日期</button>
-        <button data-rte-own type="button" @click="rte.insertPlainDateTime(); rte.insertDateOpen = false">现在时间</button>
+        <button data-rte-own type="button" title="插入今天的日期" @click="rte.insertPlainDate(); rte.insertDateOpen = false"><RteMenuGlyph label="今天日期" />今天日期</button>
+        <button data-rte-own type="button" title="插入现在的日期和时间" @click="rte.insertPlainDateTime(); rte.insertDateOpen = false"><RteMenuGlyph label="现在时间" />现在时间</button>
       </div>
     </Teleport>
 
@@ -96,7 +138,7 @@ useParentScopeStamp()
               (rte.editor?.getAttributes('image')?.align || 'center') === opt.align &&
               (rte.editor?.getAttributes('image')?.layout || 'block') === opt.layout,
           }"
-          :title="'排版：' + opt.label"
+          :title="imagePlaceTitle(opt.label) || ('排版：' + opt.label)"
           :aria-label="'图片' + opt.label"
           :aria-pressed="
             (rte.editor?.getAttributes('image')?.align || 'center') === opt.align &&
@@ -116,7 +158,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: (rte.editor?.getAttributes('image')?.displayWidth || '') === opt.value }"
-          :title="'宽度：' + opt.label"
+          :title="imageWidthTitle(opt.label) || ('宽度：' + opt.label)"
           @mousedown.prevent
           @click="rte.setImageDisplayWidth(opt.value)"
         >
@@ -137,23 +179,23 @@ useParentScopeStamp()
         <button data-rte-own
           type="button"
           class="rte-bubble-btn"
-          title="应用题注"
+          title="把输入的题注写到图片上。按 Enter 也可以"
           aria-label="应用图片说明"
           @mousedown.prevent
           @click="rte.applyImageCaption"
         >
           题注
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="删除图片" aria-label="删除图片" @mousedown.prevent @click="rte.deleteSelectedImage">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="删掉选中的这张图片" aria-label="删除图片" @mousedown.prevent @click="rte.deleteSelectedImage">
           删除
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="下载原图" aria-label="下载图片" @mousedown.prevent @click="rte.downloadSelectedImage">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="下载这张图片的原文件" aria-label="下载图片" @mousedown.prevent @click="rte.downloadSelectedImage">
           下载
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="查看大图（双击图片）" aria-label="查看大图" @mousedown.prevent @click="rte.openSelectedImage">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="打开大图，双击图片也可以" aria-label="查看大图" @mousedown.prevent @click="rte.openSelectedImage">
           大图
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="换图（保留裁剪与题注）" aria-label="换图" @mousedown.prevent @click="rte.replaceImageByUrl()">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="换成另一张图，保留裁剪和题注" aria-label="换图" @mousedown.prevent @click="rte.replaceImageByUrl()">
           换图
         </button>
         <span data-rte-own class="rte-image-replace-hint">拖到左右边缘插入该行，拖到图片中间替换</span>
@@ -166,7 +208,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: rte.imageCropPreset === preset.id }"
-          :title="'裁剪比例：' + preset.label"
+          :title="cropTitle(preset.label) || ('裁剪比例：' + preset.label)"
           :aria-pressed="rte.imageCropPreset === preset.id"
           @mousedown.prevent
           @click="rte.applyCropPreset(preset)"
@@ -187,7 +229,7 @@ useParentScopeStamp()
         <button data-rte-own
           type="button"
           class="rte-bubble-btn"
-          title="应用替代文字"
+          title="写上读屏和检索用的说明。按 Enter 也可以"
           aria-label="应用图片替代文字"
           @mousedown.prevent
           @click="rte.setImageAlt(rte.imageAlt)"
@@ -203,6 +245,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: (rte.editor?.getAttributes('image')?.borderRadius || '') === opt.value }"
+          :title="toolbarMenuItemTitle(opt.label) || undefined"
           @mousedown.prevent
           @click="rte.setImageBorderRadius(opt.value)"
         >
@@ -217,6 +260,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: (rte.editor?.getAttributes('image')?.boxShadow || '') === opt.value }"
+          :title="toolbarMenuItemTitle(opt.label) || undefined"
           @mousedown.prevent
           @click="rte.setImageBoxShadow(opt.value)"
         >
@@ -231,6 +275,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: (rte.editor?.getAttributes('image')?.borderStyle || '') === opt.value }"
+          :title="toolbarMenuItemTitle(opt.label) || undefined"
           @mousedown.prevent
           @click="rte.setImageBorderStyle(opt.value)"
         >
@@ -269,10 +314,10 @@ useParentScopeStamp()
         <option value="">全部作者</option>
         <option v-for="name in rte.suggestionAuthors" :key="name" :value="name">{{ name }}</option>
       </select>
-      <button data-rte-own type="button" :disabled="!rte.activeSuggestionId" @click="rte.acceptActiveSuggestion">接受</button>
-      <button data-rte-own type="button" :disabled="!rte.activeSuggestionId" @click="rte.rejectActiveSuggestion">拒绝</button>
-      <button data-rte-own type="button" :disabled="!rte.suggestionRanges.length" @click="rte.acceptAllSuggestions">全部接受</button>
-      <button data-rte-own type="button" :disabled="!rte.suggestionRanges.length" @click="rte.rejectAllSuggestions">全部拒绝</button>
+      <button data-rte-own type="button" title="接受当前这一条修订" :disabled="!rte.activeSuggestionId" @click="rte.acceptActiveSuggestion">接受</button>
+      <button data-rte-own type="button" title="拒绝当前这一条修订，恢复原文" :disabled="!rte.activeSuggestionId" @click="rte.rejectActiveSuggestion">拒绝</button>
+      <button data-rte-own type="button" title="接受所有修订" :disabled="!rte.suggestionRanges.length" @click="rte.acceptAllSuggestions">全部接受</button>
+      <button data-rte-own type="button" title="拒绝所有修订，全部恢复原文" :disabled="!rte.suggestionRanges.length" @click="rte.rejectAllSuggestions">全部拒绝</button>
     </div>
     <div data-rte-own
       class="rte-workspace"
@@ -287,7 +332,7 @@ useParentScopeStamp()
         role="status"
       >
         <span data-rte-own>{{ rte.charCount === 0 ? '只读预览 · 这篇文档还没有正文' : '只读预览中' }}</span>
-        <button data-rte-own type="button" class="rte-preview-back" @click="rte.setViewMode('edit')">
+        <button data-rte-own type="button" class="rte-preview-back" title="回到可以改字的编辑状态" @click="rte.setViewMode('edit')">
           返回编辑
         </button>
       </div>
@@ -310,6 +355,7 @@ useParentScopeStamp()
           class="rte-title"
           type="text"
           maxlength="100"
+          title="文档标题，最多 100 字，不写进正文"
           :value="rte.localTitle"
           placeholder="请输入标题（最多 100 个字）"
           @input="rte.onTitleInput"
@@ -329,7 +375,7 @@ useParentScopeStamp()
           v-if="rte.showTitle && rte.viewMode === 'preview' && rte.localTitle"
           class="rte-title-sep"
         />
-        <div data-rte-own v-if="rte.pageChrome.header" class="rte-page-header">{{ rte.pageChrome.header }}</div>
+        <div data-rte-own v-if="rte.screenHeader" class="rte-page-header">{{ rte.screenHeader }}</div>
         <RteTableFormulaBar
           data-rte-own
           :editor="rte.editor"
@@ -349,17 +395,17 @@ useParentScopeStamp()
           <span v-for="n in 18" :key="'wm-' + n" data-rte-own>{{ rte.watermark.text }}</span>
         </div>
         <div data-rte-own
-          v-if="rte.pageChrome.footer || rte.screenPageLabel"
+          v-if="rte.screenFooter || rte.screenPageLabel"
           class="rte-page-footer"
-          :class="{ 'is-num-only': !rte.pageChrome.footer && rte.screenPageLabel }"
+          :class="{ 'is-num-only': !rte.screenFooter && rte.screenPageLabel }"
         >
-          <span data-rte-own class="rte-page-footer-text">{{ rte.pageChrome.footer }}</span>
+          <span data-rte-own class="rte-page-footer-text">{{ rte.screenFooter }}</span>
           <span data-rte-own v-if="rte.screenPageLabel" class="rte-page-footer-num">{{ rte.screenPageLabel }}</span>
         </div>
-        <div data-rte-own v-if="rte.pageChrome.header || rte.pageChrome.footer || rte.screenPageLabel" class="rte-running-chrome" aria-hidden="true">
-          <div data-rte-own class="rte-running-header">{{ rte.pageChrome.header }}</div>
+        <div data-rte-own v-if="rte.screenHeader || rte.screenFooter || rte.screenPageLabel" class="rte-running-chrome" aria-hidden="true">
+          <div data-rte-own class="rte-running-header">{{ rte.screenHeader }}</div>
           <div data-rte-own class="rte-running-footer">
-            <span data-rte-own>{{ rte.pageChrome.footer }}</span>
+            <span data-rte-own>{{ rte.screenFooter }}</span>
             <span data-rte-own class="rte-running-num" :data-style="rte.pageChrome.pageNumber"></span>
           </div>
         </div>
@@ -370,39 +416,26 @@ useParentScopeStamp()
           @mousedown.stop
           @click.stop
         >
+          <!--
+            左侧只留这一个「+」：点开是块操作面板（插入 / 转换 / 块操作），
+            拖动可调整块顺序。手柄不再拆成 ⠿ 与 ⋮ 两个图标。
+          -->
           <button data-rte-own
-            v-if="rte.expanded"
             type="button"
-            class="rte-block-handle"
+            class="rte-block-handle rte-block-add"
             draggable="true"
-            title="拖动排序，点击打开块操作"
-            aria-label="拖动调整块顺序"
-            @click.stop="rte.onBlockGripClick"
+            title="点击打开块操作面板，拖动可调整块顺序"
+            aria-label="块操作面板"
+            aria-haspopup="menu"
+            :aria-expanded="rte.blockMenuOpen"
+            @mouseenter="rte.onBlockAddEnter()"
+            @mouseleave="rte.onBlockPanelLeave($event)"
+            @click.stop="rte.onBlockAddClick()"
             @dragstart="rte.onBlockDragStart"
             @dragend="rte.onBlockDragEnd"
           >
-            <svg data-rte-own viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-              <circle data-rte-own cx="5.5" cy="3.5" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="10.5" cy="3.5" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="5.5" cy="8" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="10.5" cy="8" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="5.5" cy="12.5" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="10.5" cy="12.5" r="1.15" fill="currentColor" />
-            </svg>
-          </button>
-          <button data-rte-own
-            type="button"
-            class="rte-block-handle"
-            title="块操作"
-            aria-label="块操作"
-            aria-haspopup="menu"
-            :aria-expanded="rte.blockMenuOpen"
-            @click.stop="rte.toggleBlockMenu"
-          >
-            <svg data-rte-own viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-              <circle data-rte-own cx="8" cy="3.5" r="1.25" fill="currentColor" />
-              <circle data-rte-own cx="8" cy="8" r="1.25" fill="currentColor" />
-              <circle data-rte-own cx="8" cy="12.5" r="1.25" fill="currentColor" />
+            <svg data-rte-own viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path data-rte-own d="M8 3.4v9.2M3.4 8h9.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
             </svg>
           </button>
         </div>
@@ -410,33 +443,68 @@ useParentScopeStamp()
           v-if="rte.blockMenuOpen"
           class="rte-block-menu"
           role="menu"
-          aria-label="块操作"
+          aria-label="块操作面板"
           :style="{ top: rte.blockHandle.top + 26 + 'px', left: rte.blockHandle.left + 'px' }"
           @mousedown.stop
           @click.stop
+          @mouseenter="rte.onBlockPanelEnter()"
+          @mouseleave="rte.onBlockPanelLeave($event)"
           @keydown="rte.onBlockMenuKeydown"
         >
-          <button data-rte-own type="button" role="menuitem" @click="rte.insertBelowHoveredBlock">在下方插入</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('paragraph')">正文</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('h1')">标题 1</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('h2')">标题 2</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('h3')">标题 3</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('bullet')">无序列表</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('ordered')">有序列表</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('task')">任务列表</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('quote')">引用</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('info')">提示</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('warn')">警告</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('success')">成功</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('error')">错误</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" @click="rte.copyHoveredBlock">复制块</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.moveHoveredBlock(-1)">上移</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.moveHoveredBlock(1)">下移</button>
-          <button data-rte-own type="button" role="menuitem" class="is-danger" @click="rte.deleteHoveredBlock">删除</button>
+          <!-- 插入区：快捷图标与分组命令均复用上方配置。 -->
+          <div data-rte-own class="rte-block-menu-section">基础</div>
+          <div data-rte-own class="rte-block-quick-grid">
+            <button data-rte-own
+              v-for="action in BLOCK_PANEL_QUICK_ACTIONS"
+              :key="action.id"
+              type="button"
+              class="rte-block-quick"
+              role="menuitem"
+              :title="action.label"
+              :aria-label="action.label"
+              :data-command="action.slashId ?? action.turn"
+              @click="runBlockQuickAction(action)"
+            >
+              <RteMenuGlyph :id="action.id" :label="action.label" />
+              <span data-rte-own class="rte-block-quick-label">{{ action.label }}</span>
+            </button>
+          </div>
+          <template v-for="section in BLOCK_PANEL_INSERT_SECTIONS" :key="section.label">
+            <div data-rte-own class="rte-block-menu-section">{{ section.label }}</div>
+            <button data-rte-own
+              v-for="item in section.items"
+              :key="item.slashId"
+              type="button"
+              class="rte-block-menu-item"
+              role="menuitem"
+              :title="blockInsertTitle(item.label, item.slashId)"
+              :aria-label="item.label"
+              :data-command="item.slashId"
+              @click="runBlockInsert(item.slashId)"
+            >
+              <RteMenuGlyph :id="item.id" :label="item.label" />
+              <span data-rte-own>{{ item.label }}</span>
+            </button>
+          </template>
+
+          <!-- 块操作区：转换与块管理，跟插入区同属一个面板。 -->
+          <div data-rte-own class="rte-block-menu-section">块操作</div>
+          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('insert')" @click="rte.insertBelowHoveredBlock"><RteMenuGlyph id="insertBelow" label="在下方插入" /><span data-rte-own>在下方插入</span></button>
+          <div data-rte-own class="rte-block-menu-sublabel">转换为</div>
+          <button data-rte-own
+            v-for="item in BLOCK_PANEL_TURN_ACTIONS"
+            :key="'turn-' + item.id"
+            type="button"
+            class="rte-block-menu-item"
+            role="menuitem"
+            :title="blockHandleTitle(item.turn ?? '')"
+            :data-command="item.turn"
+            @click="runBlockTurn(item)"
+          ><RteMenuGlyph :id="item.id" :label="item.label" /><span data-rte-own>{{ item.label }}</span></button>
+          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('copy')" @click="rte.copyHoveredBlock"><RteMenuGlyph id="copyBlock" label="复制块" /><span data-rte-own>复制块</span></button>
+          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('up')" @click="rte.moveHoveredBlock(-1)"><RteMenuGlyph id="moveUp" label="上移" /><span data-rte-own>上移</span></button>
+          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('down')" @click="rte.moveHoveredBlock(1)"><RteMenuGlyph id="moveDown" label="下移" /><span data-rte-own>下移</span></button>
+          <button data-rte-own type="button" role="menuitem" class="rte-block-menu-item is-danger" :title="blockHandleTitle('delete')" @click="rte.deleteHoveredBlock"><RteMenuGlyph id="deleteBlock" label="删除" /><span data-rte-own>删除</span></button>
         </div>
         <div data-rte-own
           v-if="rte.blockDropLine != null"
@@ -455,6 +523,7 @@ useParentScopeStamp()
             <select data-rte-own
               :value="rte.currentCodeLanguage()"
               aria-label="代码语言"
+              title="选择这段代码按哪种语法上色"
               @change="rte.setCodeLanguage(($event.target as HTMLSelectElement).value)"
             >
               <option data-rte-own v-for="opt in rte.CODE_LANG_OPTIONS" :key="'chrome-' + opt.value" :value="opt.value">
@@ -466,8 +535,8 @@ useParentScopeStamp()
             type="button"
             :class="{ 'is-on': rte.codeBlockFlag('lineNumbers') }"
             :aria-pressed="rte.codeBlockFlag('lineNumbers')"
-            aria-label="行号"
-            title="显示行号"
+            aria-label="在代码块左侧显示行号"
+            title="在代码块左侧显示行号"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('lineNumbers')"
           >行号</button>
@@ -475,24 +544,24 @@ useParentScopeStamp()
             type="button"
             :class="{ 'is-on': rte.codeBlockFlag('wordWrap') }"
             :aria-pressed="rte.codeBlockFlag('wordWrap')"
-            aria-label="自动换行"
-            title="自动换行"
+            aria-label="长行在代码块里自动换行"
+            title="长行在代码块里自动换行"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('wordWrap')"
           >换行</button>
-          <button data-rte-own type="button" aria-label="复制代码" @click="rte.copyActiveCodeBlock">复制</button>
+          <button data-rte-own type="button" aria-label="把这段代码复制到剪贴板" title="把这段代码复制到剪贴板" @click="rte.copyActiveCodeBlock">复制</button>
         </div>
         <div data-rte-own v-if="rte.showEmptyGuide" class="rte-empty-guide" @mousedown.stop>
           <span data-rte-own>空文档</span>
-          <button data-rte-own type="button" @click="rte.setHeading(1)">标题</button>
-          <button data-rte-own type="button" @click="rte.toggleBulletList">列表</button>
-          <button data-rte-own type="button" @click="rte.toggleTaskList">待办</button>
-          <button data-rte-own type="button" @click="rte.insertCallout('info')">提示</button>
-          <button data-rte-own type="button" @click="rte.toggleCodeBlock">代码</button>
-          <button data-rte-own type="button" @click="rte.insertFormula">公式</button>
-          <button data-rte-own type="button" @click="rte.openTableDialog">表格</button>
-          <button data-rte-own type="button" @click="rte.insertColumns(2)">双栏</button>
-          <button data-rte-own type="button" @click="rte.insertDateChip('date')">日期</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('heading')" @click="rte.setHeading(1)">标题</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('list')" @click="rte.toggleBulletList">列表</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('task')" @click="rte.toggleTaskList">待办</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('callout')" @click="rte.insertCallout('info')">提示</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('code')" @click="rte.toggleCodeBlock">代码</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('formula')" @click="rte.insertFormula">公式</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('table')" @click="rte.openTableDialog">表格</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('columns')" @click="rte.insertColumns(2)">双栏</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('date')" @click="rte.insertDateChip('date')">日期</button>
           <span data-rte-own class="rte-empty-guide-hint">或输入 / 插入</span>
         </div>
       </div>
@@ -550,16 +619,16 @@ useParentScopeStamp()
       >
         <div data-rte-own class="rte-outline-head">
           <span data-rte-own class="rte-outline-title">批注</span>
-          <button data-rte-own type="button" class="rte-outline-close" aria-label="关闭批注" @click="rte.notesOpen = false">×</button>
+          <button data-rte-own type="button" class="rte-outline-close" title="收起批注侧栏" aria-label="收起批注侧栏" @click="rte.notesOpen = false">×</button>
         </div>
         <p data-rte-own v-if="!rte.noteRows.length" class="rte-outline-empty">还没有批注。选中文字后用工具栏「注释」添加，内容会留在正文里。</p>
         <nav data-rte-own v-else class="rte-outline-list">
           <div data-rte-own v-for="(row, idx) in rte.noteRows" :key="row.from + '-' + idx" class="rte-note-row">
-            <button data-rte-own type="button" class="rte-outline-item" @click="rte.jumpNote(row)">
+            <button data-rte-own type="button" class="rte-outline-item" title="滚到正文里的这条注释" @click="rte.jumpNote(row)">
               <span data-rte-own class="rte-note-type">{{ row.type }}</span>
               {{ row.text || row.note || '空批注' }}
             </button>
-            <button data-rte-own type="button" class="rte-note-remove" aria-label="删除批注" @click="rte.removeNote(row)">删除</button>
+            <button data-rte-own type="button" class="rte-note-remove" title="删掉这条注释，正文留下来" aria-label="删掉这条注释" @click="rte.removeNote(row)">删除</button>
           </div>
         </nav>
       </aside>
@@ -570,10 +639,10 @@ useParentScopeStamp()
       >
         <div data-rte-own class="rte-outline-head">
           <span data-rte-own class="rte-outline-title">版本</span>
-          <button data-rte-own type="button" class="rte-outline-close" aria-label="关闭版本" @click="rte.historyOpen = false">×</button>
+          <button data-rte-own type="button" class="rte-outline-close" title="收起版本侧栏" aria-label="收起版本侧栏" @click="rte.historyOpen = false">×</button>
         </div>
         <p data-rte-own class="rte-outline-empty">记在这篇画布里，刷新后还在。自动记录保留最近 15 次，命名版本保留 8 个。不是多人协作的历史。</p>
-        <button data-rte-own type="button" class="rte-revision-name" @click="rte.nameCurrentRevision()">命名当前版本</button>
+        <button data-rte-own type="button" class="rte-revision-name" title="给现在的正文起名，命名版本会优先保留" @click="rte.nameCurrentRevision()">命名当前版本</button>
         <p data-rte-own v-if="rte.revisionNote" class="rte-outline-empty">{{ rte.revisionNote }}</p>
         <p data-rte-own v-if="!rte.revisions.length" class="rte-outline-empty">还没有版本。继续编辑一会儿会自动记下，也可以现在命名。</p>
         <nav data-rte-own v-else class="rte-outline-list">
@@ -586,7 +655,7 @@ useParentScopeStamp()
               <span data-rte-own class="rte-revision-label">{{ rev.label || '自动记录' }}</span>
               <span data-rte-own class="rte-revision-time">{{ rte.formatRevisionTime(rev.at) }}</span>
             </div>
-            <button data-rte-own type="button" class="rte-revision-restore" @click="rte.restoreRevision(rev.id)">恢复</button>
+            <button data-rte-own type="button" class="rte-revision-restore" title="先记下当前正文，再换成这一版" @click="rte.restoreRevision(rev.id)">恢复</button>
           </div>
         </nav>
       </aside>
@@ -600,8 +669,8 @@ useParentScopeStamp()
           <button data-rte-own
             type="button"
             class="rte-outline-close"
-            title="关闭大纲"
-            aria-label="关闭大纲"
+            title="收起大纲侧栏"
+            aria-label="收起大纲侧栏"
             @click="rte.closeOutlinePanel"
           >
             ×
@@ -630,19 +699,7 @@ useParentScopeStamp()
     </div>
 
     <div data-rte-own v-if="rte.wordCountDockOpen" class="rte-word-dock" role="dialog" aria-label="字数统计">
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>字符</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>词数</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>中文</span><strong data-rte-own>{{ rte.wordParts.cn }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.wordParts.en }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>图片</span><strong data-rte-own>{{ rte.wordParts.images }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>阅读</span><strong data-rte-own>约 {{ rte.readingMinutes }} 分钟</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>标题</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row">
-        <span data-rte-own>选区</span>
-        <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.chars : '—' }}</strong>
-      </div>
-      <button data-rte-own type="button" class="rte-word-dock-close" @click="rte.wordCountDockOpen = false">关闭</button>
+      <RteWordStatsPanel v-bind="wordStatsPanelProps" @close="rte.wordCountDockOpen = false" />
     </div>
 
     <div data-rte-own v-if="rte.showBottomBar" class="rte-bottom">
@@ -651,6 +708,7 @@ useParentScopeStamp()
           v-if="rte.showPublishActions"
           type="button"
           class="rte-bottom-link"
+          title="打开发布选项。这项还在准备中"
           @click="rte.onPublishSettings"
         >
           发布设置 ▾
@@ -659,7 +717,7 @@ useParentScopeStamp()
           type="button"
           class="rte-wordcount"
           :aria-expanded="rte.wordCountDockOpen"
-          title="字数统计"
+          :title="wordStatTitle('dock')"
           @click="rte.toggleWordCountDock"
         >
           字数 {{ rte.charCount }} · 中 {{ rte.wordParts.cn }} · 英 {{ rte.wordParts.en }} · 图 {{ rte.wordParts.images }}
@@ -692,6 +750,7 @@ useParentScopeStamp()
           <select data-rte-own
             :value="rte.pageSize"
             aria-label="页面大小"
+            title="纸张大小，预览和打印按这个排"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageSize(($event.target as HTMLSelectElement).value)"
           >
@@ -705,6 +764,7 @@ useParentScopeStamp()
           <select data-rte-own
             :value="rte.pageMargin.preset"
             aria-label="页边距"
+            title="页边距预设：常规、窄、适中、宽或无边距"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setMarginPreset(($event.target as HTMLSelectElement).value)"
           >
@@ -721,6 +781,7 @@ useParentScopeStamp()
             :value="rte.pageChrome.header"
             maxlength="80"
             aria-label="页眉"
+            title="印在每页顶部，最多 80 字"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageHeader(($event.target as HTMLInputElement).value)"
           />
@@ -732,6 +793,7 @@ useParentScopeStamp()
             :value="rte.pageChrome.headerEven"
             maxlength="80"
             aria-label="偶数页页眉"
+            title="偶数页单独的页眉，留空则跟奇数页一样"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageHeaderEven(($event.target as HTMLInputElement).value)"
           />
@@ -746,6 +808,7 @@ useParentScopeStamp()
             max="40"
             step="0.1"
             aria-label="装订线毫米"
+            title="加在左边距上，0 到 40 毫米"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageGutter(($event.target as HTMLInputElement).value)"
           />
@@ -757,8 +820,21 @@ useParentScopeStamp()
             :value="rte.pageChrome.footer"
             maxlength="80"
             aria-label="页脚"
+            title="印在每页底部，最多 80 字"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageFooter(($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
+          偶数页脚
+          <input data-rte-own
+            class="rte-page-chrome-input"
+            :value="rte.pageChrome.footerEven"
+            maxlength="80"
+            aria-label="偶数页页脚"
+            title="偶数页单独的页脚，留空则跟奇数页一样"
+            :disabled="rte.viewMode !== 'edit'"
+            @change="rte.setPageFooterEven(($event.target as HTMLInputElement).value)"
           />
         </label>
         <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
@@ -766,6 +842,7 @@ useParentScopeStamp()
           <select data-rte-own
             :value="rte.pageChrome.pageNumber"
             aria-label="页码"
+            title="页码样式：1、第 1 页、第 1 页共 n 页，或 - 1 -"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageNumber(($event.target as HTMLSelectElement).value)"
           >
@@ -774,18 +851,19 @@ useParentScopeStamp()
             </option>
           </select>
         </label>
-        <button data-rte-own type="button" class="rte-bottom-link" @click="rte.openPresent">演示</button>
+        <button data-rte-own type="button" class="rte-bottom-link" title="开始演示，按块或按屏翻页，Esc 退出" @click="rte.openPresent">演示</button>
         <span data-rte-own v-if="rte.pageSheetEnabled && rte.pageMargin.preset === 'custom'" class="rte-margin-custom">
-          <label data-rte-own>上<input data-rte-own :value="rte.pageMargin.top" type="number" min="0" max="80" step="0.1" aria-label="上边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('top', ($event.target as HTMLInputElement).value)" /></label>
-          <label data-rte-own>下<input data-rte-own :value="rte.pageMargin.bottom" type="number" min="0" max="80" step="0.1" aria-label="下边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('bottom', ($event.target as HTMLInputElement).value)" /></label>
-          <label data-rte-own>左<input data-rte-own :value="rte.pageMargin.left" type="number" min="0" max="80" step="0.1" aria-label="左边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('left', ($event.target as HTMLInputElement).value)" /></label>
-          <label data-rte-own>右<input data-rte-own :value="rte.pageMargin.right" type="number" min="0" max="80" step="0.1" aria-label="右边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('right', ($event.target as HTMLInputElement).value)" /></label>
+          <label data-rte-own>上<input data-rte-own :value="rte.pageMargin.top" type="number" min="0" max="80" step="0.1" aria-label="上边距毫米" title="上边距，0 到 80 毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('top', ($event.target as HTMLInputElement).value)" /></label>
+          <label data-rte-own>下<input data-rte-own :value="rte.pageMargin.bottom" type="number" min="0" max="80" step="0.1" aria-label="下边距毫米" title="下边距，0 到 80 毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('bottom', ($event.target as HTMLInputElement).value)" /></label>
+          <label data-rte-own>左<input data-rte-own :value="rte.pageMargin.left" type="number" min="0" max="80" step="0.1" aria-label="左边距毫米" title="左边距，0 到 80 毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('left', ($event.target as HTMLInputElement).value)" /></label>
+          <label data-rte-own>右<input data-rte-own :value="rte.pageMargin.right" type="number" min="0" max="80" step="0.1" aria-label="右边距毫米" title="右边距，0 到 80 毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('right', ($event.target as HTMLInputElement).value)" /></label>
         </span>
         <button data-rte-own
           v-if="rte.expanded && rte.viewMode === 'edit'"
           type="button"
           class="rte-bottom-link"
           :aria-pressed="rte.notesOpen"
+          title="打开侧栏，看正文里的注释"
           @click="rte.notesOpen = !rte.notesOpen"
         >
           批注
@@ -795,6 +873,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bottom-link"
           :aria-pressed="rte.commentsOpen"
+          title="打开评论栏，看还没解决的讨论"
           @click="rte.commentsOpen = !rte.commentsOpen"
         >
           评论<span data-rte-own v-if="rte.unresolvedCount"> {{ rte.unresolvedCount }}</span>
@@ -891,13 +970,13 @@ useParentScopeStamp()
         @mousedown.prevent
         @contextmenu.prevent
       >
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuJump()">跳到这一节</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuMove(-1)">上移整节</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuMove(1)">下移整节</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCascade(-1)">整节升一级</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCascade(1)">整节降一级</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCopyTitle()">复制标题</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCopyLink()">复制标题链接</button>
+        <button data-rte-own type="button" role="menuitem" title="滚到这个标题，并闪一下" @click="rte.outlineMenuJump()">跳到这一节</button>
+        <button data-rte-own type="button" role="menuitem" title="这一节连同下面的正文，和上一节对调" @click="rte.outlineMenuMove(-1)">上移整节</button>
+        <button data-rte-own type="button" role="menuitem" title="这一节连同下面的正文，和下一节对调" @click="rte.outlineMenuMove(1)">下移整节</button>
+        <button data-rte-own type="button" role="menuitem" title="这一节和下属标题都提高一级" @click="rte.outlineMenuCascade(-1)">整节升一级</button>
+        <button data-rte-own type="button" role="menuitem" title="这一节和下属标题都降低一级" @click="rte.outlineMenuCascade(1)">整节降一级</button>
+        <button data-rte-own type="button" role="menuitem" title="把这一节的标题复制到剪贴板" @click="rte.outlineMenuCopyTitle()">复制标题</button>
+        <button data-rte-own type="button" role="menuitem" title="复制可以跳到这一节的链接" @click="rte.outlineMenuCopyLink()">复制标题链接</button>
       </div>
     </Teleport>
 
@@ -909,7 +988,7 @@ useParentScopeStamp()
         class="rte-mobile-btn"
         :class="{ active: rte.isActive('bold') }"
         aria-label="加粗"
-        title="加粗"
+        title="把选中文字加粗"
         @mousedown.prevent
         @click="rte.toggleBold"
       >
@@ -921,7 +1000,7 @@ useParentScopeStamp()
         class="rte-mobile-btn"
         :class="{ active: rte.isActive('italic') }"
         aria-label="斜体"
-        title="斜体"
+        title="把选中文字变成斜体"
         @mousedown.prevent
         @click="rte.toggleItalic"
       >
@@ -933,7 +1012,7 @@ useParentScopeStamp()
         class="rte-mobile-btn"
         :class="{ active: rte.isActive('bulletList') }"
         aria-label="列表"
-        title="列表"
+        title="把这段改成无序列表"
         @mousedown.prevent
         @click="rte.toggleBulletList"
       >
@@ -945,7 +1024,7 @@ useParentScopeStamp()
         class="rte-mobile-btn"
         :class="{ active: rte.isActive('link') }"
         aria-label="链接"
-        title="链接"
+        title="给选中文字加链接"
         @mousedown.prevent
         @click="rte.insertLink"
       >
@@ -956,7 +1035,7 @@ useParentScopeStamp()
         type="button"
         class="rte-mobile-btn"
         aria-label="提及"
-        title="提及"
+        title="在光标处插入 @，再选人"
         @mousedown.prevent
         @click="rte.insertMentionFromToolbar"
       >
@@ -967,7 +1046,7 @@ useParentScopeStamp()
         type="button"
         class="rte-mobile-btn"
         aria-label="评论"
-        title="评论"
+        title="给选中的文字写评论"
         @mousedown.prevent
         @click="rte.beginComment"
       >
@@ -978,7 +1057,7 @@ useParentScopeStamp()
         type="button"
         class="rte-mobile-btn"
         aria-label="更多工具"
-        title="更多工具"
+        title="打开更多工具"
         @mousedown.prevent
         @click="rte.openMoreMenu"
       >

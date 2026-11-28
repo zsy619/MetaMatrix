@@ -1,10 +1,8 @@
 import { ref, type Ref, type ShallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Editor } from '@tiptap/core'
-import html2canvas from 'html2canvas'
 import { feishuClipboardDocument } from '../../../utils/rteRound7'
 import { buildDocxBlob } from '../../../utils/rteExportDocx'
-import { buildPdfFromElement } from '../../../utils/rteExportPdf'
 import { htmlToMarkdown, withExternalLinkRel } from '../../../utils/rteExportMd'
 import { withHeadingNumbers } from '../../../utils/rteHeadingExport'
 import { buildExportHtmlWithCharts } from '../../../utils/rteExportChartSnapshots'
@@ -34,6 +32,43 @@ export function useExport(deps: {
 }) {
 const exportMenuOpen = ref(false)
 const exportBusy = ref(false)
+/** PNG / PDF 的真实阶段进度；工具栏或其他调用方可直接订阅，不使用计时器伪造百分比。 */
+const exportProgress = ref(0)
+const exportPhase = ref('')
+const exportStatus = ref<'idle' | 'running' | 'cancelling' | 'success' | 'error' | 'cancelled'>('idle')
+let activeExportController: AbortController | null = null
+
+function updateExportProgress(progress: { phase: string; percent: number }) {
+  exportPhase.value = progress.phase
+  exportProgress.value = Math.max(0, Math.min(100, Math.round(progress.percent)))
+}
+
+function beginRasterExport(): AbortController {
+  const controller = new AbortController()
+  activeExportController = controller
+  exportProgress.value = 0
+  exportPhase.value = 'prepare'
+  exportStatus.value = 'running'
+  return controller
+}
+
+/** 取消只针对支持 AbortSignal 的 PNG / PDF；取消后 catch 分支不会触发下载或成功提示。 */
+function cancelExport() {
+  const controller = activeExportController
+  if (!controller || controller.signal.aborted) return
+  exportStatus.value = 'cancelling'
+  controller.abort()
+  ElMessage.info('正在取消导出，未完成的文件不会下载')
+}
+
+function isExportCancelled(error: unknown, controller: AbortController): boolean {
+  return controller.signal.aborted || (error instanceof Error && error.name === 'AbortError')
+}
+
+function rasterExportErrorMessage(error: unknown): string {
+  // 像素预算、分页完整性等错误包含可执行的具体原因，不能只显示一句笼统的“失败”。
+  return error instanceof Error && error.message ? error.message : '未知导出错误'
+}
 
 function closeExportMenu() {
   exportMenuOpen.value = false
@@ -213,28 +248,51 @@ async function exportAsPng() {
     return
   }
   exportBusy.value = true
+  const controller = beginRasterExport()
   root?.classList.add('rte-printing')
-  // 图表块在这里换成白底静态快照，导出结束后还原
+  // 图表块在这里换成白底静态快照，导出结束后还原。
   window.dispatchEvent(new CustomEvent(RTE_BEFORE_EXPORT_EVENT))
   try {
-    const canvas = await html2canvas(el, {
-      backgroundColor: '#ffffff',
+    // 重型栅格化与 PDF 模块仅在真正导出时加载，保持编辑器首屏的动态拆包策略。
+    const {
+      rasterizeElementForExport,
+      throwIfExportAborted,
+      yieldToExportMainThread,
+    } = await import('../../../utils/rteExportPdf')
+    throwIfExportAborted(controller.signal)
+    const canvas = await rasterizeElementForExport(el, {
       scale: 2,
-      useCORS: true,
-      logging: false,
+      signal: controller.signal,
+      onProgress: updateExportProgress,
     })
+    updateExportProgress({ phase: 'render', percent: 92 })
+    await yieldToExportMainThread(controller.signal)
+    const dataUrl = canvas.toDataURL('image/png')
+    if (!dataUrl.startsWith('data:image/png')) throw new Error('PNG 图像编码失败，未生成文件')
+    throwIfExportAborted(controller.signal)
+    // 编码完成后仍让出一次主线程，确保此时发出的取消也不会落入成功下载分支。
+    await yieldToExportMainThread(controller.signal)
     const link = document.createElement('a')
     link.download = `${exportFileBasename()}.png`
-    link.href = canvas.toDataURL('image/png')
+    link.href = dataUrl
     link.click()
+    updateExportProgress({ phase: 'finalize', percent: 100 })
+    exportStatus.value = 'success'
     deps.onAudit?.('图片')
     ElMessage.success('已导出图片')
   } catch (err) {
-    console.error(err)
-    ElMessage.error('导出图片失败')
+    if (isExportCancelled(err, controller)) {
+      exportStatus.value = 'cancelled'
+      ElMessage.info('已取消图片导出，未生成文件')
+    } else {
+      exportStatus.value = 'error'
+      console.error(err)
+      ElMessage.error(`导出图片失败：${rasterExportErrorMessage(err)}`)
+    }
   } finally {
     window.dispatchEvent(new CustomEvent(RTE_AFTER_EXPORT_EVENT))
     root?.classList.remove('rte-printing')
+    if (activeExportController === controller) activeExportController = null
     exportBusy.value = false
   }
 }
@@ -252,26 +310,42 @@ async function exportAsPdf() {
     return
   }
   exportBusy.value = true
+  const controller = beginRasterExport()
   root?.classList.add('rte-printing')
   window.dispatchEvent(new CustomEvent(RTE_BEFORE_EXPORT_EVENT))
   try {
     const title = (deps.title.value || '').trim() || '未命名文档'
     const marginMm = deps.pageScreenMargin.value
+    // 保持动态导入，且把同一取消信号贯穿栅格化、分页、文字层与最终下载。
+    const { buildPdfFromElement, throwIfExportAborted } = await import('../../../utils/rteExportPdf')
+    throwIfExportAborted(controller.signal)
     const blob = await buildPdfFromElement(el, {
       title,
       pageSize: deps.pageSize.value,
       marginMm,
       chrome: deps.pageChrome.value,
+      signal: controller.signal,
+      onProgress: updateExportProgress,
     })
+    throwIfExportAborted(controller.signal)
     triggerDownloadBlob(blob, `${exportFileBasename()}.pdf`)
+    updateExportProgress({ phase: 'finalize', percent: 100 })
+    exportStatus.value = 'success'
     deps.onAudit?.('PDF')
     ElMessage.success('已导出 PDF')
   } catch (err) {
-    console.error(err)
-    ElMessage.error('导出 PDF 失败')
+    if (isExportCancelled(err, controller)) {
+      exportStatus.value = 'cancelled'
+      ElMessage.info('已取消 PDF 导出，未生成文件')
+    } else {
+      exportStatus.value = 'error'
+      console.error(err)
+      ElMessage.error(`导出 PDF 失败：${rasterExportErrorMessage(err)}`)
+    }
   } finally {
     window.dispatchEvent(new CustomEvent(RTE_AFTER_EXPORT_EVENT))
     root?.classList.remove('rte-printing')
+    if (activeExportController === controller) activeExportController = null
     exportBusy.value = false
   }
 }
@@ -337,6 +411,10 @@ async function exportAsMarkdown() {
   return {
     exportMenuOpen,
     exportBusy,
+    exportProgress,
+    exportPhase,
+    exportStatus,
+    cancelExport,
     closeExportMenu,
     onExportMenu,
     copyAsFeishuHtml,

@@ -25,8 +25,8 @@
 }
 
 .rte-root {
-  /* 块手柄列留白：正文左侧必须空出的宽度（收起态只有 ⋮ 菜单一个按钮）。 */
-  --rte-gutter-size: 26px;
+  /* 紧凑态为「+ + ⋮」两个按钮，正文左侧留白与 rteGutter.ts 保持一致。 */
+  --rte-gutter-size: 50px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -40,9 +40,9 @@
   cursor: text;
 }
 
-/* 展开态手柄有 ⠿ 拖拽 + ⋮ 菜单两个按钮，留白要够放下一整列。 */
+/* 展开态手柄有「+ 插入 + ⠿ 拖拽 + ⋮ 菜单」三个按钮，另留 4px 正文间距。 */
 .rte-root.expanded {
-  --rte-gutter-size: 50px;
+  --rte-gutter-size: 74px;
 }
 
 .rte-toolbar-tools {
@@ -232,19 +232,32 @@
 .rte-toolbar-search {
   display: inline-flex;
   align-items: center;
-  flex: 0 1 140px;
-  min-width: 88px;
-  margin: 0 8px 4px;
+  position: relative;
+  flex: 0 1 96px;
+  min-width: 80px;
+  margin: 0 4px 4px;
 }
 .rte-toolbar-search input {
   width: 100%;
   height: 26px;
   border: 1px solid #d0d3d8;
   border-radius: 6px;
-  padding: 0 8px;
+  padding: 0 22px 0 8px;
   font-size: 12px;
   background: #fff;
   color: #1d2129;
+}
+.rte-toolbar-search-clear {
+  position: absolute;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #4e5969;
+  cursor: pointer;
+  line-height: 18px;
 }
 .rte-toolbar-mode-note {
   margin: 0 8px 4px;
@@ -443,16 +456,17 @@
   display: flex;
   flex-direction: column;
   overflow: hidden !important;
-  padding: 0;
-}
-.rte-float-menu.rte-template-menu .rte-template-menu-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  max-height: var(--rte-float-max-h, min(70vh, 560px));
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  width: 600px;
+  max-width: 100%;
+  min-width: 0;
+  /* !important：压过 telegram.ui.css 的通用浮层外壳（8px 圆角 + 轻阴影）。
+     模板面板是 600px 的大浮层，按 AGENTS.md §2「浮层表面」规格走：
+     12px 圆角 + 1px 发丝线 + 中性投影 0 24px 64px。 */
+  padding: 0 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--tg-border, #e6e6e6) !important;
+  background: var(--tg-surface, #fff) !important;
+  box-shadow: var(--tg-shadow-3, 0 24px 64px rgba(15, 23, 42, 0.18)) !important;
 }
 .rte-float-menu.rte-import-menu,
 .rte-float-menu.rte-more-menu {
@@ -474,8 +488,22 @@
   cursor: pointer;
 }
 
-.rte-menu button:hover {
+.rte-menu button:hover,
+.rte-more-menu button:hover {
   background: #f2f3f5;
+}
+.rte-menu button:focus-visible,
+.rte-more-menu button:focus-visible,
+.rte-emoji-panel button:focus-visible,
+.rte-specialchars-panel button:focus-visible,
+.rte-spacing-panel button:focus-visible {
+  outline: 2px solid #165dff;
+  outline-offset: 1px;
+  background: #f2f3f5;
+}
+.rte-menu button .rte-table-ctx-ico {
+  margin-right: 8px;
+  vertical-align: -3px;
 }
 
 .rte-canvas {
@@ -610,7 +638,7 @@
   justify-content: center;
   padding: 0;
   pointer-events: auto;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background 120ms ease, color 120ms ease, opacity 140ms ease, transform 140ms ease;
 }
 .rte-block-handle:hover,
 .rte-block-handle:focus-visible {
@@ -621,27 +649,56 @@
 .rte-block-handle[draggable='true'] {
   cursor: grab;
 }
+
+/* 「+」是左侧唯一的入口，做得更像飞书：细线条、悬停时浮起、焦点有环。 */
+.rte-block-add {
+  color: #646a73;
+}
+/* 「+」同时是拖拽柄，但主用途是点开面板，光标仍按按钮给。 */
+.rte-block-add[draggable='true'] {
+  cursor: pointer;
+}
+.rte-block-add:hover {
+  background: #eef0f3;
+  color: #1f2329;
+  box-shadow: 0 1px 2px rgba(31, 35, 41, 0.08);
+}
+.rte-block-add:focus-visible {
+  background: #eef0f3;
+  color: #1f2329;
+  box-shadow: 0 0 0 2px rgba(51, 112, 255, 0.32);
+}
+.rte-block-add svg {
+  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.rte-block-add:hover svg {
+  transform: scale(1.12);
+}
 .rte-block-menu {
   position: absolute;
   z-index: 6;
-  min-width: 168px;
-  max-height: min(360px, 64vh);
-  overflow: auto;
+  box-sizing: border-box;
+  /* 宽度同时受视口约束，窄屏不横向溢出。 */
+  width: min(320px, calc(100vw - 16px));
+  max-height: min(560px, 72vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   padding: 6px;
   background: #fff;
   border: 1px solid #dee0e3;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(31, 35, 41, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(31, 35, 41, 0.16), 0 2px 6px rgba(31, 35, 41, 0.06);
   display: flex;
   flex-direction: column;
+  color: #1f2329;
 }
 .rte-block-menu button {
-  text-align: left;
   border: none;
   background: transparent;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 13px;
   color: #1f2329;
   cursor: pointer;
 }
@@ -650,12 +707,127 @@
   background: #f2f3f5;
   outline: none;
 }
-.rte-block-menu button.is-danger {
+.rte-block-menu button:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(51, 112, 255, 0.55);
+}
+/* 分组标题只承担信息层级，不进入 menuitem 键盘导航序列。 */
+.rte-block-menu-section {
+  /* 组与组之间一条发丝线 + 稍强的小标题，避免整块菜单看起来是一张平铺清单。 */
+  margin: 4px 0 0;
+  padding: 10px 8px 6px;
+  border-top: 1px solid #f0f1f3;
+  color: #4e5969;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  user-select: none;
+}
+.rte-block-menu-section:first-child {
+  margin-top: 0;
+  padding-top: 2px;
+  border-top: none;
+}
+/* 子分组标题（块操作下的「转换为」）：不画分隔线，只做弱层级。 */
+.rte-block-menu-sublabel {
+  padding: 8px 8px 2px;
+  color: #8f959e;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  user-select: none;
+}
+/* 基础区：四列等宽格子，图标在上、名称在下，不再是一排认不出的图标。 */
+.rte-block-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 2px 0 6px;
+}
+.rte-block-menu .rte-block-quick {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  height: 54px;
+  padding: 6px 2px;
+  border: 1px solid transparent;
+  text-align: center;
+}
+.rte-block-menu .rte-block-quick:hover,
+.rte-block-menu .rte-block-quick:focus-visible {
+  border-color: #dee0e3;
+  background: #f5f6f7;
+}
+/* 格子里的名称：11px，hover 时转主色，和图标一起反馈。 */
+.rte-block-quick-label {
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 14px;
+  color: #4e5969;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rte-block-menu .rte-block-quick:hover .rte-block-quick-label,
+.rte-block-menu .rte-block-quick:focus-visible .rte-block-quick-label {
+  color: #3370ff;
+}
+.rte-block-menu .rte-block-quick:hover .rte-menu-glyph,
+.rte-block-menu .rte-block-quick:focus-visible .rte-menu-glyph {
+  color: #3370ff;
+}
+/* 普通命令统一为「图标 + 文字」，避免原纯文字列表难以扫描。 */
+.rte-block-menu .rte-block-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 5px 8px;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+}
+.rte-block-menu .rte-menu-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  color: #4e5969;
+}
+.rte-block-menu .rte-menu-glyph :deep(svg) {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+.rte-block-menu .rte-block-menu-item:hover .rte-menu-glyph,
+.rte-block-menu .rte-block-menu-item:focus-visible .rte-menu-glyph {
+  color: #3370ff;
+}
+.rte-block-menu .rte-block-quick .rte-menu-glyph,
+.rte-block-menu .rte-block-quick .rte-menu-glyph :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+.rte-block-menu .rte-block-quick .rte-menu-glyph {
+  flex-basis: 20px;
+}
+.rte-block-menu button.is-danger,
+.rte-block-menu button.is-danger .rte-menu-glyph {
   color: #f54a45;
 }
 .rte-block-menu button.is-danger:hover,
 .rte-block-menu button.is-danger:focus-visible {
   background: #fef1f1;
+}
+/* 当前已打开的面板对应手柄保持高亮，便于识别菜单来源。 */
+.rte-block-handle[aria-expanded='true'] {
+  background: #e8f0fe;
+  color: #3370ff;
 }
 .rte-block-handle:active {
   cursor: grabbing;
@@ -686,11 +858,15 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  box-shadow: none;
+  padding: 3px 4px;
+  border: 1px solid rgba(15, 23, 42, .07);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .74);
+  backdrop-filter: blur(10px) saturate(165%);
+  -webkit-backdrop-filter: blur(10px) saturate(165%);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, .05),
+    0 8px 20px -14px rgba(15, 23, 42, .32);
 }
 .rte-code-chrome select,
 .rte-code-chrome button {
@@ -701,18 +877,30 @@
   font-size: 12px;
   border-radius: 4px;
   cursor: pointer;
+  transition:
+    background .16s ease,
+    color .16s ease;
 }
 .rte-code-chrome button {
   padding: 0 8px;
 }
+.rte-code-chrome select {
+  padding: 0 4px 0 6px;
+  outline: none;
+}
+.rte-code-chrome select:focus-visible,
+.rte-code-chrome button:focus-visible {
+  outline: 2px solid rgba(51, 112, 255, .45);
+  outline-offset: 1px;
+}
 .rte-code-chrome select:hover,
 .rte-code-chrome button:hover,
 .rte-code-chrome button.is-on {
-  background: #f2f3f5;
+  background: rgba(15, 23, 42, .06);
 }
 .rte-code-chrome button.is-on {
   color: #3370ff;
-  background: #e1eaff;
+  background: rgba(51, 112, 255, .12);
 }
 .rte-empty-guide {
   display: flex;
@@ -862,9 +1050,15 @@
 .rte-root :deep(.ProseMirror ul:not([data-type='taskList'])) {
   list-style: disc;
 }
-.rte-root :deep(.tiptap ol),
-.rte-root :deep(.ProseMirror ol) {
+.rte-root :deep(.tiptap ol:not([data-list-style]):not([type])),
+.rte-root :deep(.ProseMirror ol:not([data-list-style]):not([type])) {
   list-style: decimal;
+  padding-left: 1.6em;
+}
+.rte-root :deep(.tiptap ol[data-list-style]),
+.rte-root :deep(.ProseMirror ol[data-list-style]),
+.rte-root :deep(.tiptap ol[type]),
+.rte-root :deep(.ProseMirror ol[type]) {
   padding-left: 1.6em;
 }
 .rte-root :deep(.tiptap li),
@@ -950,32 +1144,93 @@
 
 .rte-root :deep(.tiptap pre),
 .rte-root :deep(.ProseMirror pre) {
-  background: #f5f6f7;
-  border-radius: 8px;
+  position: relative;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f3f5f8 100%);
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, .04),
+    0 10px 26px -18px rgba(15, 23, 42, .28);
   /* 顶上留出代码浮层（语言 / 行号 / 换行 / 复制）的高度，避免盖住第一行 */
-  padding: 36px 16px 12px;
+  padding: 36px 18px 14px;
   overflow: auto;
-  font-size: 14px;
+  color: #1f2937;
+  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13.5px;
   line-height: 22px;
-  margin: 8px 0;
+  letter-spacing: .2px;
+  tab-size: 2;
+  margin: 10px 0;
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease;
+}
+
+.rte-root :deep(.tiptap pre:hover),
+.rte-root :deep(.ProseMirror pre:hover) {
+  border-color: rgba(15, 23, 42, .12);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, .05),
+    0 14px 30px -18px rgba(15, 23, 42, .32);
+}
+
+.rte-root :deep(pre code),
+.rte-root :deep(pre pre) {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+}
+
+.rte-root :deep(pre ::selection) {
+  background: rgba(51, 112, 255, .18);
+}
+
+/* 空代码块给个提示，别让人以为是块空白砖 */
+.rte-root :deep(pre:has(> code:empty))::before,
+.rte-root :deep(pre:has(> code > br.ProseMirror-trailingBreak))::before {
+  content: '在此粘贴或输入代码…';
+  display: block;
+  color: #a9aeb8;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 代码块滚动条 */
+.rte-root :deep(pre::-webkit-scrollbar) {
+  width: 10px;
+  height: 10px;
+}
+
+.rte-root :deep(pre::-webkit-scrollbar-thumb) {
+  background: rgba(15, 23, 42, .18);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+.rte-root :deep(pre::-webkit-scrollbar-thumb:hover) {
+  background: rgba(15, 23, 42, .32);
+  background-clip: content-box;
 }
 
 .rte-root :deep(pre[data-line-numbers='1']) {
   position: relative;
-  padding-left: 3.2em;
+  padding-left: 3.4em;
   line-height: 22px;
 }
 
 .rte-root :deep(.rte-code-gutter) {
   position: absolute;
   top: 36px;
-  left: 8px;
+  left: 10px;
   width: 2.2em;
   text-align: right;
-  color: #8f959e;
+  color: #a5abb5;
   font-size: 12px;
   line-height: 22px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   white-space: pre;
   user-select: none;
   pointer-events: none;
@@ -1231,76 +1486,6 @@
   user-select: none;
 }
 
-.rte-template-menu {
-  min-width: 480px;
-  max-width: 560px;
-  padding: 0;
-  /* 外层不裁切，避免挡住移入路径；滚动在 .rte-template-menu-body */
-  overflow: visible;
-}
-
-.rte-template-menu-body {
-  padding: 6px;
-  max-height: min(70vh, 560px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-.rte-template-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  margin: 0 0 8px;
-}
-
-.rte-template-menu .rte-menu-section-label {
-  grid-column: 1 / -1;
-  padding: 6px 8px 4px;
-}
-
-.rte-template-menu .rte-template-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 2px;
-  min-width: 0;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
-  text-align: left;
-  line-height: 1.35;
-  white-space: normal;
-  border: 1px solid transparent;
-  border-radius: 6px;
-}
-
-.rte-template-menu .rte-template-item:hover {
-  background: #f2f3f5;
-  border-color: #e5e6eb;
-}
-
-.rte-template-item-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1d2129;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.rte-template-item-desc {
-  font-size: 11px;
-  font-weight: 400;
-  color: #86909c;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .rte-menu button:disabled,
 .rte-table-ctx button:disabled,
 .rte-table-ops-item:disabled {
@@ -1315,10 +1500,11 @@
 }
 
 .rte-float-menu.rte-table-menu {
-  min-width: 148px;
+  min-width: 128px;
+  width: max-content;
+  max-width: 168px;
   z-index: 60;
-  max-height: min(70vh, 520px);
-  overflow: auto;
+  overflow: visible;
 }
 
 .rte-table-ctx-mask {
@@ -1330,10 +1516,10 @@
 .rte-table-ctx {
   position: fixed;
   z-index: 5001;
-  min-width: 160px;
-  max-width: min(280px, 92vw);
-  max-height: min(92vh, 640px);
-  overflow: auto;
+  width: max-content;
+  min-width: 128px;
+  max-width: 168px;
+  overflow: visible;
   padding: 4px;
   background: #fff;
   border: 1px solid #e5e6eb;
@@ -1357,6 +1543,105 @@
 .rte-table-ctx button:hover:not(:disabled) {
   background: #f2f3f5;
 }
+.rte-table-ctx-group {
+  position: relative;
+}
+.rte-table-ctx-group > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+.rte-table-ctx-group > button.active,
+.rte-table-ctx-flyout button.active {
+  background: #eef3ff;
+  color: #1d4ed8;
+}
+.rte-table-ctx-caret {
+  color: #86909c;
+  font-size: 12px;
+}
+.rte-table-ctx-flyout {
+  position: fixed;
+  z-index: 5002;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 196px;
+  max-width: min(280px, 92vw);
+  max-height: min(70vh, 480px);
+  overflow: auto;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+.rte-table-ctx-flyout > button,
+.rte-table-ctx-flyout .rte-table-insert-line > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.rte-table-ctx-ico {
+  display: inline-flex;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: #4e5969;
+}
+.rte-table-ctx-ico svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.rte-table-ctx-group > button.active .rte-table-ctx-ico,
+.rte-table-ctx-flyout > button:hover .rte-table-ctx-ico,
+.rte-table-ctx-flyout .rte-table-insert-line > button:hover .rte-table-ctx-ico {
+  color: inherit;
+}
+.rte-table-ctx-label {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.rte-table-insert-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rte-table-insert-line > button {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+.rte-table-insert-count {
+  flex: 0 0 56px;
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+.rte-table-insert-count input {
+  width: 56px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #1d2129;
+  font-size: 13px;
+  text-align: center;
+  padding: 0 2px;
+}
+.rte-table-insert-count input:focus {
+  outline: 2px solid rgba(51, 112, 255, 0.35);
+  border-color: #3370ff;
+}
 
 .rte-table-ops-sheet {
   width: min(320px, 92vw);
@@ -1378,6 +1663,13 @@
   overflow: auto;
 }
 
+.rte-table-menu > button,
+.rte-table-menu .rte-table-insert-line > button,
+.rte-table-ops-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .rte-table-ops-item {
   border: none;
   background: transparent;
@@ -1633,6 +1925,36 @@
 .rte-more-item.active {
   background: #f2f3f5;
 }
+.rte-more-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.rte-more-item:disabled:hover {
+  background: transparent;
+}
+.rte-more-kbd {
+  margin-left: auto;
+  color: #86909c;
+  font-size: 11px;
+}
+.rte-toolbar-search-jump {
+  margin: 0 8px 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #4e5969;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rte-toolbar-search-jump:hover {
+  color: #165dff;
+}
+.rte-toolbar-search-jump.is-empty,
+.rte-toolbar-search-jump.is-empty:hover {
+  cursor: default;
+  color: #4e5969;
+}
 
 .rte-more-icon {
   width: 18px;
@@ -1820,7 +2142,9 @@
   max-height: 320px;
   overflow-y: auto;
 }
-.rte-menu button.active {
+.rte-menu button.active,
+.rte-menu button[aria-pressed="true"],
+.rte-more-menu button[aria-pressed="true"] {
   background: #eef3ff;
   color: #165dff;
 }
@@ -1954,6 +2278,28 @@
 }
 .rte-more-flyout > button {
   flex: 0 0 auto;
+}
+/* 「更多」里的模板面板：与工具栏直开面板同一套外观（Telegram Web K） */
+.rte-more-flyout.rte-template-menu {
+  /* 「更多」面板自身可滚动高度只有 min(420px, 70vh)，模板面板要矮于它，
+     否则 sticky 定位的浮层底部会被裁掉。 */
+  --rte-float-max-h: min(380px, 56vh);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  /* !important 理由同 .rte-float-menu.rte-template-menu：压过 telegram.ui.css 通用外壳 */
+  padding: 0 !important;
+  border: 1px solid var(--tg-border, #e6e6e6) !important;
+  border-radius: 12px !important;
+  background: var(--tg-surface, #fff) !important;
+  box-shadow: var(--tg-shadow-3, 0 24px 64px rgba(15, 23, 42, 0.18)) !important;
+  max-height: min(380px, 56vh);
+  overflow: hidden;
+}
+/* 模板面板要完整展开，把「更多」浮层撑到能容纳面板的宽度 */
+.rte-more-menu:has(.rte-template-menu) {
+  min-width: min(600px, 92vw);
 }
 .rte-root.expanded .rte-color-menu {
   /* 颜色面板较宽：优先左对齐；若贴右可由工具条 overflow:visible + bridge 兜底 */
@@ -2616,8 +2962,8 @@
   max-height: 32px;
   width: auto;
   margin-right: 2px;
-  padding: 0 8px;
-  gap: 4px;
+  padding: 0 4px;
+  gap: 2px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -2637,6 +2983,14 @@
   font-size: 12px;
   line-height: 16px;
   color: inherit;
+}
+/* 收起/展开只留箭头（title 已提供悬浮说明），把宽度让给栏目标签，
+   避免窄窗口下最后几个栏目被挤到横向滚动区里看不见。 */
+.rte-root.expanded .rte-mode-bar .rte-toolbar-fold .rte-tool-label {
+  display: none;
+}
+.rte-root.expanded .rte-mode-bar .rte-toolbar-fold {
+  padding: 0 6px;
 }
 .rte-toolbar-fold {
   position: static;
@@ -3983,41 +4337,23 @@
   font: inherit;
   cursor: pointer;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--tg-radius-xs, 6px);
 }
 .rte-wordcount:hover,
 .rte-wordcount[aria-expanded='true'] {
-  background: var(--mm-blue-soft, #e8f0fe);
-  color: var(--mm-blue, #1a73e8);
+  background: var(--tg-blue-soft, rgba(51, 144, 236, 0.12));
+  color: var(--tg-blue, #3390ec);
 }
 .rte-word-dock {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px 12px;
-  margin: 0;
-  padding: 8px 12px;
-  border-top: 1px solid var(--mm-line, #e8eaed);
-  background: var(--mm-surface, #fff);
-  font-size: 12px;
-  color: var(--mm-muted, #5f6368);
-}
-.rte-word-dock-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-.rte-word-dock-row strong {
-  color: var(--mm-text, #202124);
-  font-weight: 600;
-}
-.rte-word-dock-close {
-  justify-self: end;
-  grid-column: 1 / -1;
-  border: none;
-  background: transparent;
-  color: var(--mm-blue, #1a73e8);
-  cursor: pointer;
-  font-size: 12px;
+  /* 底栏入口复用工具栏的「字数统计」面板组件，这里只做浮层外壳。 */
+  width: 320px;
+  max-width: 100%;
+  margin: 0 auto 12px;
+  border: 1px solid var(--tg-border, #e6e6e6);
+  border-radius: var(--tg-radius-md, 12px);
+  background: var(--tg-surface, #fff);
+  box-shadow: var(--tg-shadow-3, 0 24px 64px rgba(15, 23, 42, 0.18));
+  overflow: hidden;
 }
 .rte-root.expanded .rte-canvas {
   background: #f5f6f7;
@@ -4127,17 +4463,15 @@
   width: auto;
   margin: 16px auto 28px;
   color: #1d2129;
-  font-size: 22px;
-  line-height: 32px;
-  padding: 32px 24px 48px max(24px, var(--rte-gutter-size));
+  padding: 0 16px 24px max(8px, var(--rte-gutter-size));
   background-color: #fffef8 !important;
+  background-origin: content-box !important;
   background-attachment: local !important;
   background-image:
-    linear-gradient(to right, #c45c5c 1px, transparent 1px),
-    linear-gradient(to bottom, #c45c5c 1px, transparent 1px),
-    linear-gradient(to right, transparent 15px, rgba(196, 92, 92, 0.45) 15px, rgba(196, 92, 92, 0.45) 17px, transparent 17px),
-    linear-gradient(to bottom, transparent 15px, rgba(196, 92, 92, 0.45) 15px, rgba(196, 92, 92, 0.45) 17px, transparent 17px) !important;
-  background-size: 32px 32px !important;
+    repeating-linear-gradient(to bottom, transparent 0 3px, #5b8fd6 3px 4px, transparent 4px 10px, #c5d4ea 10px 11px, transparent 11px 17px, #5b8fd6 17px 18px, transparent 18px 24px, #5b8fd6 24px 25px, transparent 25px var(--tz-row, 74px)),
+    repeating-linear-gradient(to right, #c45c5c 0 1px, transparent 1px var(--tz-cell, 48px)),
+    repeating-linear-gradient(to bottom, transparent 0 var(--tz-py, 26px), #c45c5c var(--tz-py, 26px) calc(var(--tz-py, 26px) + 1px), transparent calc(var(--tz-py, 26px) + 1px) calc(var(--tz-row, 74px) - 1px), #c45c5c calc(var(--tz-row, 74px) - 1px) var(--tz-row, 74px)) !important;
+  background-size: auto, var(--tz-cell, 48px) var(--tz-row, 74px), auto !important;
   box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06);
 }
 .rte-root[data-page-size='full']:not([data-margin='none']) .rte-body,
@@ -4430,12 +4764,28 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   min-width: 0;
   gap: 0;
   min-height: 30px;
-  padding: 0;
+  padding: 0 4px 0 0;
   background: transparent;
   overflow-x: auto;
   flex-wrap: nowrap;
-  scrollbar-width: thin;
+  /* 横向滚动时不显示任何滚动条（Windows / macOS / Firefox 全覆盖） */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   scroll-snap-type: x proximity;
+  /* 只在真正溢出时才做边缘渐隐，避免「最后一个栏目被抹掉」的误读 */
+  mask-image: linear-gradient(to right, transparent, #000 6px, #000 calc(100% - 6px), transparent);
+}
+.rte-ribbon-tabs::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+.rte-ribbon-tabs::-webkit-scrollbar-track,
+.rte-ribbon-tabs::-webkit-scrollbar-thumb,
+.rte-ribbon-tabs::-webkit-scrollbar-corner {
+  display: none;
+  width: 0;
+  height: 0;
 }
 .rte-ribbon-tab {
   scroll-snap-align: start;
@@ -4450,20 +4800,62 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-ribbon-tab {
   flex: 0 0 auto;
   height: 28px;
-  margin: 0 1px;
+  margin: 0;
   padding: 0 10px;
   border: 1px solid transparent;
   border-bottom: none;
-  border-radius: 3px 3px 0 0;
+  border-radius: 8px 8px 0 0;
   background: transparent;
-  color: #323130;
-  font-size: 13px;
+  color: #5b6675;
+  font-size: 12px;
+  font-weight: 500;
   line-height: 26px;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 .rte-ribbon-tab:hover {
-  background: #edebe9;
+  background: rgba(15, 23, 42, 0.06);
+  color: #1d2129;
+}
+.rte-ribbon-tab:focus-visible {
+  outline: 2px solid #165dff;
+  outline-offset: -2px;
+}
+.rte-ribbon-tab.is-search-miss {
+  opacity: 0.45;
+}
+.rte-ribbon-tab.is-search-best {
+  box-shadow: inset 0 -2px 0 #165dff;
+}
+.rte-tool-group.is-search-group .rte-tool {
+  box-shadow: inset 0 0 0 1px #94bfff;
+}
+.rte-tool-group.is-search-group[data-search-best] .rte-tool {
+  box-shadow: inset 0 0 0 2px #165dff;
+}
+.rte-more-item:focus-visible {
+  outline: 2px solid #165dff;
+  outline-offset: 1px;
+}
+.rte-group-empty {
+  margin: 4px 8px 8px;
+  color: #86909c;
+  font-size: 12px;
+}
+.rte-ribbon-hit {
+  display: inline-block;
+  min-width: 14px;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #165dff;
+  color: #fff;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
 }
 .rte-ribbon-tab.active {
   background: #fff;
@@ -4739,3 +5131,180 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   border-right-color: #3a3f47;
 }
 
+
+/* —— 导入 Markdown：所见即所得预览弹窗 —— */
+.rte-md-import-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(1080px, 94vw);
+  max-height: 88vh;
+  box-sizing: border-box;
+  padding: 18px 20px 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18);
+}
+.rte-md-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.rte-md-import-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.rte-md-import-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-text-1, #1d2129);
+}
+.rte-md-import-file {
+  font-size: 12px;
+  color: var(--tg-text-3, #86909c);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 46ch;
+}
+.rte-md-import-close {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tg-text-3, #86909c);
+  cursor: pointer;
+  font-size: 14px;
+}
+.rte-md-import-close:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--tg-text-1, #1d2129);
+}
+.rte-md-import-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+/* 分段控件：灰底容器 + 白色药丸选中块 */
+.rte-md-import-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.06);
+}
+.rte-md-import-seg button {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tg-text-2, #4e5969);
+  font-size: 13px;
+  cursor: pointer;
+}
+.rte-md-import-seg button.is-active {
+  background: #fff;
+  color: var(--tg-text-1, #1d2129);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.rte-md-import-stats {
+  font-size: 12px;
+  color: var(--tg-text-3, #86909c);
+}
+.rte-md-import-body {
+  display: grid;
+  gap: 12px;
+  min-height: 320px;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.rte-md-import-body[data-view='split'] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.rte-md-import-body[data-view='preview'],
+.rte-md-import-body[data-view='source'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.rte-md-import-source {
+  margin: 0;
+  padding: 14px 16px;
+  max-height: 58vh;
+  overflow: auto;
+  border-radius: 10px;
+  background: #f7f8fa;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--tg-text-2, #4e5969);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.rte-md-import-preview-root {
+  overflow: auto;
+  max-height: 58vh;
+  padding: 18px 20px;
+  border-radius: 10px;
+  background: #f7f8fa;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+/* 预览沿用正文排版，但不要块手柄列留白 */
+.rte-md-import-preview {
+  padding-left: 0 !important;
+  min-height: 0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+/* 动作区右对齐（弹窗规范：主次按钮最小宽度 88px） */
+.rte-md-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.rte-md-import-actions .rte-modal-confirm {
+  background: var(--tg-blue, #3390ec);
+}
+.rte-md-import-actions .rte-modal-confirm:hover {
+  background: #2b82d9;
+}
+.rte-md-import-actions .rte-modal-cancel,
+.rte-md-import-actions .rte-modal-confirm,
+.rte-md-import-action {
+  height: 36px;
+  min-width: 88px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.rte-md-import-action {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  color: var(--tg-text-1, #1d2129);
+}
+.rte-md-import-action:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+@media (max-width: 900px) {
+  .rte-md-import-body[data-view='split'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}

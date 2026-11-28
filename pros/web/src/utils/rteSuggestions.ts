@@ -4,6 +4,7 @@ import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/st
 import { ReplaceStep } from '@tiptap/pm/transform'
 import { isHistoryTransaction } from '@tiptap/pm/history'
 import { authorColor } from './rteCommentThreads'
+import { canEditRange } from '../extensions/blockPermissionGuard'
 
 export type SuggestionAuthor = { id: string; name: string }
 
@@ -240,9 +241,10 @@ export function applySuggestionDecision(
   state: EditorState,
   mode: 'accept' | 'reject',
   id?: string,
+  allowRange?: (from: number, to: number) => boolean,
 ): Transaction | null {
   const ranges = collectSuggestionRanges(state.doc)
-    .filter((range) => !id || range.id === id)
+    .filter((range) => (!id || range.id === id) && (!allowRange || allowRange(range.from, range.to)))
     .sort((a, b) => b.from - a.from)
   if (!ranges.length) return null
   const tr = state.tr
@@ -285,7 +287,7 @@ export function applySuggestionDecision(
 }
 
 export function dispatchSuggestionDecision(editor: Editor, mode: 'accept' | 'reject', id?: string): boolean {
-  const tr = applySuggestionDecision(editor.state, mode, id)
+  const tr = applySuggestionDecision(editor.state, mode, id, (from, to) => canEditRange(editor, from, to))
   if (!tr) return false
   editor.view.dispatch(tr.scrollIntoView())
   return true

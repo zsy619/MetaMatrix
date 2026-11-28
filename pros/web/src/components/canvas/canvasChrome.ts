@@ -17,8 +17,7 @@ export const CANVAS_CHROME = {
   selectSoft: 'rgba(22, 40, 64, 0.42)',
   focus: '#163044',
   hoverWash: '#e8f1fa',
-  headerShadow:
-    '0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28)',
+  headerShadow: '0 1px 0 rgba(0, 0, 0, 0.18)',
 } as const
 
 /**

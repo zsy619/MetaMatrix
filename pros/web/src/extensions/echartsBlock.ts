@@ -15,7 +15,7 @@ import { applyChartAria } from '../utils/echarts/chartA11yOption'
 import { buildChartA11ySummary, type ChartA11ySummary } from '../utils/echarts/chartA11y'
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
-import { chartRenderOption, type ChartRenderMode } from '../utils/rteChartTheme'
+import { chartRenderOption, type ChartMotion, type ChartRenderMode } from '../utils/rteChartTheme'
 import { ensureRenderableChartOption } from '../utils/echarts/chartRenderGuard'
 import {
   resolveDataSourceConfig,
@@ -55,8 +55,8 @@ declare module '@tiptap/core' {
   }
 }
 
-/** 图表块默认高度（px）。 */
-const DEFAULT_HEIGHT = 320
+/** 图表块默认高度（px）。留出标题、图例和坐标，避免 320 里挤成一条。 */
+const DEFAULT_HEIGHT = 400
 /** 导出/打印前后的自定义事件，NodeView 靠它做白底快照。 */
 export const RTE_BEFORE_EXPORT_EVENT = 'rte:before-export'
 export const RTE_AFTER_EXPORT_EVENT = 'rte:after-export'
@@ -82,9 +82,19 @@ function chartMode(host: HTMLElement): ChartRenderMode {
   return host.closest('.rte-root')?.classList.contains('is-dark-editor') ? 'dark' : 'light'
 }
 
-/** 渲染副本。用户写过的背景色保留；没写时暗色编辑区才用深底。不写回文档。 */
-function renderOption(option: Record<string, unknown>, mode: ChartRenderMode): Record<string, unknown> {
-  return ensureRenderableChartOption(chartRenderOption(option, mode))
+/** 渲染副本。用户写过的背景色保留。不写回文档。 */
+function renderOption(
+  option: Record<string, unknown>,
+  mode: ChartRenderMode,
+  motion: ChartMotion = 'still',
+): Record<string, unknown> {
+  return ensureRenderableChartOption(chartRenderOption(option, mode, motion))
+}
+
+function chartMotion(opening: boolean): ChartMotion {
+  if (!opening) return 'still'
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return 'still'
+  return 'play'
 }
 
 export const EchartsBlock = Node.create({
@@ -350,10 +360,9 @@ export const EchartsBlock = Node.create({
 
       const render = async () => {
         if (destroyed || !previewEl) return
-        const seq = (renderSeq += 1)
         const parsed = safeParseEchartsOption(current.attrs.option || '')
-        // 接口拉到的数据优先（只影响显示，不写回文档）
         const effective = remoteOption || (parsed.ok ? parsed.option : {})
+        // 接口拉到的数据优先（只影响显示，不写回文档）
         liveSource = effective
         watchDark()
         // 无障碍摘要：先更新，option 解析失败时也要把摘要清空
@@ -372,6 +381,9 @@ export const EchartsBlock = Node.create({
           const viewport = window.innerHeight || previewEl.ownerDocument.documentElement.clientHeight || 0
           const inView = rect.height === 0 || (rect.bottom > 0 && rect.top < viewport)
           if (!inView) {
+            // 不在视口内：交给 IntersectionObserver，等滚入可见再渲染。
+            // 注意：这里不递增 renderSeq，否则会把正在加载 echarts/echarts-gl 的
+            // 渲染（seq=1）误判为过期而 abort，导致图表永远不渲染。
             const obs = new IntersectionObserver((entries) => {
               if (!entries.some((entry) => entry.isIntersecting)) return
               obs.disconnect()
@@ -381,6 +393,9 @@ export const EchartsBlock = Node.create({
             return
           }
         }
+        // 只有真正要执行渲染（通过了 IO 检查）才占用一个 seq。
+        // 这样 IO defer 的 render 不会打断正在进行的异步加载。
+        const seq = (renderSeq += 1)
         if (!parsed.ok) {
           chart?.dispose()
           chart = null
@@ -399,7 +414,9 @@ export const EchartsBlock = Node.create({
             await loadEchartsGl()
           }
           // 加载期间可能又改了 option，旧的渲染结果直接丢掉
-          if (destroyed || !previewEl || seq !== renderSeq) return
+          if (destroyed || !previewEl || seq !== renderSeq) {
+            return
+          }
           const renderer = echartsRendererFor(effective)
           if (chart && chartRenderer !== renderer) {
             // 渲染器不能热切换（SVG ↔ Canvas），重建实例
@@ -410,6 +427,7 @@ export const EchartsBlock = Node.create({
             }
             chart = null
           }
+          const opening = !chart
           if (!chart) {
             // 面板折叠时容器宽度是 0，这时初始化会得到一张空图。
             // 先不初始化，等容器有宽度了（ResizeObserver 回调里再 render）再画。
@@ -423,8 +441,9 @@ export const EchartsBlock = Node.create({
           }
           // custom 系列的 renderItem 在文档里只存预设名，这里换成内置函数
           // 渲染前补 aria（默认开启 + 自动摘要），ECharts 自身才能把描述播报出来
+          // 只有第一次画出这张图时播放生长动画，之后的刷新和导出停在终帧。
           chart.setOption(
-            applyChartAria(renderOption(resolveEchartsRenderItems(effective), chartMode(dom))),
+            applyChartAria(renderOption(resolveEchartsRenderItems(effective), chartMode(dom), chartMotion(opening))),
             { notMerge: true },
           )
           resizeChart()

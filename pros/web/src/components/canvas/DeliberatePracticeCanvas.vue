@@ -66,6 +66,28 @@ const hostBlocks = computed(() =>
 
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
+const narrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+
+function syncNarrow() {
+  narrow.value = !!narrowQuery?.matches
+}
+
+function cardTitle(id: DeliberatePracticeBlockId): string {
+  switch (id) {
+    case 'premise':
+      return props.doc.labels.premiseTitle
+    case 'node_a':
+      return props.doc.nodes.a.title
+    case 'node_b':
+      return props.doc.nodes.b.title
+    case 'node_c':
+      return props.doc.nodes.c.title
+    case 'node_d':
+      return props.doc.nodes.d.title
+  }
+}
+
 const colorA = computed(() => props.doc.nodes.a.color || '#2A649F')
 const colorB = computed(() => props.doc.nodes.b.color || '#0E8A84')
 const colorC = computed(() => props.doc.nodes.c.color || '#A67C00')
@@ -267,9 +289,13 @@ watch(maximizedPanelKey, (key) => {
 
 onMounted(() => {
   documentStore.ensureDeliberatePracticeBlocks()
+  narrowQuery = window.matchMedia('(max-width: 800px)')
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
 })
 
 onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', syncNarrow)
   if (
     activeEditorId.value &&
     maximizedPanelKey.value === activeMaximizeKey.value
@@ -548,14 +574,15 @@ onBeforeUnmount(() => {
       由块内 Teleport .pm-overlay 铺满文档视口（panel-maximize 规则）。
       必须用 v-if（非 v-show），避免空 id 挂载崩溃。
     -->
-    <div class="dp-block-host" aria-hidden="true">
-      <template v-for="item in hostBlocks" :key="item.id">
+    <div class="dp-block-host" :aria-hidden="narrow ? undefined : true">
+      <section v-for="item in hostBlocks" :key="item.id" class="dp-card">
+        <h3 class="dp-card-title">{{ cardTitle(item.id) }}</h3>
         <YModelBlockCard
           v-if="item.block"
           :block="item.block"
           hide-title
         />
-      </template>
+      </section>
     </div>
   </div>
 </template>
@@ -826,6 +853,11 @@ onBeforeUnmount(() => {
   margin: -1px;
 }
 
+.dp-card-title {
+  display: none;
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .dp-canvas {
     overflow-y: auto;
@@ -862,6 +894,126 @@ onBeforeUnmount(() => {
     bottom: 4px;
     right: 4px;
     transform: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .dp-canvas {
+    overflow: auto;
+    padding: 12px 12px 96px;
+  }
+
+  .premise-title {
+    white-space: normal;
+    font-size: 22px;
+  }
+
+  .premise-hotspot {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .premise-bullets,
+  .bridge-col {
+    font-size: 14px;
+  }
+
+  .dp-stage {
+    flex: 0 0 auto;
+    min-height: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .practice-tag {
+    position: static;
+    align-self: flex-end;
+    margin: 8px 0 0;
+    transform: none;
+  }
+
+  .dp-diagram {
+    width: 100%;
+    height: auto;
+    max-height: none;
+    aspect-ratio: 1000 / 640;
+  }
+
+  .dp-block-host {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: auto;
+    height: auto;
+    margin: 14px 0 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+  }
+
+  .dp-card {
+    padding: 12px 12px 10px;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+
+  .dp-card-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #202124;
+  }
+
+  .dp-card :deep(.ym-block),
+  .dp-card :deep(.ym-block-body),
+  .dp-card :deep(.rte-root),
+  .dp-card :deep(.rte-workspace),
+  .dp-card :deep(.rte-canvas),
+  .dp-card :deep(.rte-body),
+  .dp-card :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .dp-card :deep(.ym-block) {
+    min-height: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .dp-card :deep(.rte-workspace),
+  .dp-card :deep(.rte-canvas),
+  .dp-card :deep(.ProseMirror) {
+    width: 100%;
+  }
+
+  .dp-card :deep(.ProseMirror) {
+    min-height: 96px;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .dp-card :deep(.ProseMirror p) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .dp-card :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
   }
 }
 </style>

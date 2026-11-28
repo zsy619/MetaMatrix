@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { ListStyleAttrs } from '../extensions/listStyleAttrs'
+import { RteImage } from '../extensions/rteImage'
 import { RteTableCell, RteTableHeader } from '../extensions/rteTableCells'
 import { retargetList } from './rteListContinue'
 import { pasteTsvIntoTable } from './rteRound7'
@@ -48,7 +49,7 @@ describe('列表、表格粘贴和换图', () => {
     expect(unwrapSinglePastedList('<p>甲</p><ul><li>乙</li></ul>')).toContain('<p>甲</p>')
   })
 
-  it('粘贴表格丢掉命名空间，留下合并和文字，并收起重复图号', () => {
+  it('粘贴表格丢掉命名空间，留下合并和文字，并收起重复图号', async () => {
     const html = sanitizePastedHtml(
       '<p><o:p>甲</o:p></p><table xmlns:w="urn:schemas-microsoft-com:office:word"><tr><td colspan="2">合并</td></tr></table>' +
         '<img src="data:image/png;base64,aaaa" alt="图"><p>图 1 销售趋势</p><nav>导航</nav>',
@@ -60,6 +61,28 @@ describe('列表、表格粘贴和换图', () => {
     expect(html).not.toContain('<nav')
     expect(html).toContain('data-caption="销售趋势"')
     expect(html).not.toContain('图 1')
+    const wrapped = sanitizePastedHtml(
+      '<p><img src="https://example.com/a.png" alt="趋势"></p><p>图 1 销售趋势</p>',
+    )
+    expect(wrapped).toContain('data-caption="销售趋势"')
+    expect(wrapped).not.toContain('图 1')
+    const figure = sanitizePastedHtml(
+      '<figure><img src="https://example.com/b.png" alt="章节"><figcaption>图 2-1：季度对比</figcaption></figure>',
+    )
+    expect(figure).toContain('data-caption="季度对比"')
+    expect(figure).not.toContain('图 2-1')
+    const plainCaption = sanitizePastedHtml(
+      '<figure><img src="https://example.com/c.png" alt="趋势"><figcaption>季度趋势</figcaption></figure>',
+    )
+    expect(plainCaption).toContain('data-caption="季度趋势"')
+    expect(plainCaption).not.toContain('<figcaption')
+    const ed = mount(wrapped, [RteImage.configure({ inline: false, allowBase64: true })])
+    let caption = ''
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'image') caption = String(node.attrs.caption || '')
+    })
+    expect(caption).toBe('销售趋势')
+    await new Promise((resolve) => queueMicrotask(resolve))
     const group = sanitizePastedHtml(
       '<div data-type="image-group" data-layout="mix" data-ratios="1,2,1" data-stack-at="1" data-stack-side="right"><img src="data:image/png;base64,aaaa" alt="甲"></div>',
     )
@@ -84,6 +107,76 @@ describe('列表、表格粘贴和换图', () => {
     expect(pasteTsvIntoTable(ed, '44927\t8')).toBe(true)
     expect(ed.getText()).toContain('2023-01-01')
     expect(ed.getText()).toContain('8')
+  })
+
+  it('合并单元格后粘贴按屏幕上的列填入', () => {
+    const ed = mount(
+      `<table><tbody>
+        <tr><td colspan="2"><p>合</p></td><td><p>右</p></td></tr>
+        <tr><td><p>a</p></td><td><p>b</p></td><td><p>c</p></td></tr>
+      </tbody></table>`,
+      [Table.configure({ resizable: false }), TableRow, RteTableHeader, RteTableCell],
+    )
+    let pos = -1
+    ed.state.doc.descendants((node, at) => {
+      if (pos < 0 && node.type.name === 'tableCell' && node.textContent === '合') pos = at + 2
+    })
+    ed.commands.setTextSelection(pos)
+    expect(pasteTsvIntoTable(ed, '甲\t乙')).toBe(true)
+    const texts: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell') texts.push(node.textContent)
+    })
+    expect(texts).toEqual(['甲', '乙', 'a', 'b', 'c'])
+
+    let left = -1
+    ed.state.doc.descendants((node, at) => {
+      if (left < 0 && node.type.name === 'tableCell' && node.textContent === 'a') left = at + 2
+    })
+    ed.commands.setTextSelection(left)
+    expect(pasteTsvIntoTable(ed, '"甲\t内"\t乙\t丙')).toBe(true)
+    const next: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell') next.push(node.textContent)
+    })
+    expect(next).toEqual(['甲', '乙', '甲\t内', '乙', '丙'])
+  })
+
+  it('只复制一列时按换行往下填', () => {
+    const ed = mount(
+      '<table><tbody><tr><td><p>甲</p></td><td><p>1</p></td></tr><tr><td><p>乙</p></td><td><p>2</p></td></tr><tr><td><p>丙</p></td><td><p>3</p></td></tr></tbody></table>',
+      [Table.configure({ resizable: false }), TableRow, RteTableHeader, RteTableCell],
+    )
+    let pos = -1
+    ed.state.doc.descendants((node, at) => {
+      if (pos < 0 && node.type.name === 'tableCell' && node.textContent === '甲') pos = at + 2
+    })
+    ed.commands.setTextSelection(pos)
+    expect(pasteTsvIntoTable(ed, '红\n绿')).toBe(true)
+    const texts: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell') texts.push(node.textContent)
+    })
+    expect(texts).toEqual(['红', '1', '绿', '2', '丙', '3'])
+    expect(pasteTsvIntoTable(ed, '只改这一格')).toBe(false)
+  })
+
+  it('粘贴超出末尾时补上新行', () => {
+    const ed = mount(
+      '<table><tbody><tr><td><p>甲</p></td><td><p>1</p></td></tr><tr><td><p>乙</p></td><td><p>2</p></td></tr></tbody></table>',
+      [Table.configure({ resizable: false }), TableRow, RteTableHeader, RteTableCell],
+    )
+    let pos = -1
+    ed.state.doc.descendants((node, at) => {
+      if (pos < 0 && node.type.name === 'tableCell' && node.textContent === '甲') pos = at + 2
+    })
+    ed.commands.setTextSelection(pos)
+    expect(pasteTsvIntoTable(ed, '红\t9\n绿\t8\n蓝\t7')).toBe(true)
+    const texts: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell') texts.push(node.textContent)
+    })
+    expect(texts).toEqual(['红', '9', '绿', '8', '蓝', '7'])
   })
 
   it('换图保留题注、裁剪和替代文本', () => {

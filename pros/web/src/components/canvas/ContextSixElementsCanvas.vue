@@ -12,7 +12,7 @@ import { canvasChromeStyle } from './canvasChrome'
 import type { ContextSixElementsDocumentJSON } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import { useSelectionStore } from '../../stores/selection'
-import { panelMaximizeKey } from '../../composables/usePanelMaximize'
+import { panelMaximizeKey, usePanelMaximize } from '../../composables/usePanelMaximize'
 import RichTextEditor from '../RichTextEditor.vue'
 import { itemsToHtml, syncItemsFromHtml } from '../../utils/itemsHtml'
 import {
@@ -33,6 +33,8 @@ documentStore.ensureContextSixElementsBlocks()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const panelId = panelMaximizeKey('block', CONTEXT_SIX_ELEMENTS_BLOCK_ID)
+const { isMaximized, openMaximize, closeMaximize } = usePanelMaximize(panelId)
+openMaximize()
 
 const block = computed(() => {
   const list = Array.isArray(props.doc.blocks) ? props.doc.blocks : []
@@ -66,6 +68,7 @@ function onEditorFocus() {
 
 onMounted(() => {
   documentStore.ensureContextSixElementsBlocks()
+  openMaximize()
 })
 </script>
 
@@ -81,21 +84,64 @@ onMounted(() => {
         </p>
       </header>
 
-      <RichTextEditor
-        class="cse-rte"
-        :panel-id="panelId"
-        :expanded="false"
-        :show-title="false"
-        :show-bottom-bar="true"
-        :show-publish-actions="false"
-        :show-markdown-hint="false"
-        placeholder="按六段结构填写上下文…"
-        :model-value="editorHtml"
-        @update:model-value="onEditorHtml"
-        @focus="onEditorFocus"
-      />
+      <div class="cse-editor">
+        <RichTextEditor
+          v-if="!isMaximized"
+          class="cse-rte"
+          :panel-id="panelId"
+          :expanded="false"
+          :page-sheet="false"
+          :show-title="false"
+          :show-bottom-bar="true"
+          :show-publish-actions="false"
+          :show-markdown-hint="false"
+          placeholder="按六段结构填写上下文…"
+          :model-value="editorHtml"
+          @update:model-value="onEditorHtml"
+          @focus="onEditorFocus"
+        />
+        <button type="button" class="pm-max-btn cse-max" title="最大化" aria-label="最大化" @click="openMaximize">
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="11" height="11" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="isMaximized"
+      class="pm-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="上下文六要素"
+    >
+      <div class="pm-card" @click.stop>
+        <div class="pm-header">
+          <h3 class="pm-title">上下文六要素</h3>
+          <div class="pm-actions">
+            <button type="button" class="cse-restore" aria-label="还原" @click="closeMaximize">还原</button>
+          </div>
+        </div>
+        <div class="pm-body">
+          <RichTextEditor
+            class="pm-rte"
+            :panel-id="panelId"
+            :expanded="true"
+            :show-title="false"
+            :show-bottom-bar="true"
+            :show-publish-actions="false"
+            :show-markdown-hint="false"
+            placeholder="按六段结构填写上下文…"
+            :model-value="editorHtml"
+            @update:model-value="onEditorHtml"
+            @focus="onEditorFocus"
+          />
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -105,7 +151,9 @@ onMounted(() => {
   z-index: 10;
   box-sizing: border-box;
   display: flex;
-  overflow: auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   padding: 18px;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
@@ -113,16 +161,22 @@ onMounted(() => {
 
 .cse-page {
   box-sizing: border-box;
-  width: min(100%, 880px);
-  margin: auto;
-  padding: 22px 26px 30px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 22px 26px 18px;
   border-radius: 12px;
   background: #ffffff;
   border: 1px solid var(--cv-frame, #ececec);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
 }
 
 .cse-head {
+  flex: none;
   margin-bottom: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
@@ -130,19 +184,108 @@ onMounted(() => {
 
 .cse-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 720;
+  line-height: 1.3;
   color: var(--cv-ink-strong, #202124);
 }
 
 .cse-hint {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 6px 0 0;
+  font-size: 15px;
   line-height: 1.6;
-  color: var(--cv-muted, #5f6368);
+  color: #3c4043;
+}
+
+.cse-editor {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .cse-rte {
-  min-height: 420px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cse-max {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+}
+
+.cse-canvas :deep(.rte-root) {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto !important;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.cse-canvas :deep(.rte-workspace) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cse-canvas :deep(.rte-canvas) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: auto;
+  background: transparent;
+}
+
+.cse-canvas :deep(.rte-body) {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.cse-canvas :deep(.rte-body > .ProseMirror),
+.cse-canvas :deep(.rte-body > .tiptap) {
+  flex: 1 1 auto;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.cse-restore {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--cv-frame, #ececec);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--cv-focus, #1c4c7c);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+@media (max-width: 800px) {
+  .cse-canvas {
+    padding: 12px 10px 96px;
+  }
+
+  .cse-page {
+    padding: 16px 14px 20px;
+  }
+
+  .cse-canvas :deep(.ProseMirror) {
+    padding: 12px 12px 16px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
 </style>

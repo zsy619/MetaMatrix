@@ -3,7 +3,6 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import html2canvas from 'html2canvas'
 import {
   useDocumentStore,
   isTemplateId,
@@ -555,6 +554,8 @@ async function onExportPng() {
     ui.setZoom(1)
     await new Promise((r) => requestAnimationFrame(() => r(null)))
     await new Promise((r) => setTimeout(r, 50))
+    // html2canvas 约 1MB，按需加载：只有真的导出时才拉进来。
+    const { default: html2canvas } = await import('html2canvas')
     const canvas = await html2canvas(el, {
       backgroundColor: '#fcfcfc',
       scale: 2,

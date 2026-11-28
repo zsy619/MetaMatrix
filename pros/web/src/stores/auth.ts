@@ -1,12 +1,19 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref } from 'vue'
 import * as authApi from '../api/auth'
+import * as logsApi from '../api/logs'
 import type { User } from '../api/auth'
-import { getToken, setToken } from '../api/http'
+import {
+  ApiError,
+  getToken,
+  setToken,
+  setUnauthorizedHandler,
+  type UnauthorizedRefreshResult,
+} from '../api/http'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { clearRecentOpens } from '../utils/canvasTransfer'
 import { clearMediaThumbs } from '../utils/mediaThumb'
-import { clearMediaHydrateBlobs } from '../extensions/mediaHydrate'
+import { clearMediaHydrateBlobs } from '../extensions/mediaHydrateState'
 
 const USER_KEY = 'metamatrix:auth:user'
 
@@ -43,6 +50,67 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => Boolean(token.value))
 
+  /**
+   * 当前登录用户 ID。
+   *
+   * 优先用缓存的 user 对象；但缓存可能缺失（清了 localStorage 的 user、
+   * 或者接口刷新失败），这时退回解析 JWT 里的 uid / sub ——
+   * 拿不到用户 ID 的功能（比如「视图个人偏好」）会静默退化成共享配置，
+   * 属于「保存到了别的地方」这种很难自查的问题，所以这里给足兜底。
+   */
+  const currentUserId = computed(() => {
+    if (user.value?.id) return user.value.id
+    const raw = token.value
+    if (!raw) return ''
+    try {
+      const part = raw.split('.')[1]
+      if (!part) return ''
+      // base64url → base64，并补齐 padding（atob 对缺失的 '=' 会直接抛错）。
+      const normalized = part.replace(/-/g, '+').replace(/_/g, '/')
+      const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+      const payload = JSON.parse(atob(padded)) as { uid?: string; sub?: string }
+      return payload.uid ?? payload.sub ?? ''
+    } catch {
+      return ''
+    }
+  })
+
+  /**
+   * 解析 JWT 里的 exp 字段（秒级时间戳），返回毫秒时间戳。
+   * 解析不出来返回 null，表示"看不懂这个 token 的有效期"。
+   */
+  function tokenExpiryMs(raw: string): number | null {
+    const part = raw.split('.')[1]
+    if (!part) return null
+    try {
+      const padded = part.replace(/-/g, '+').replace(/_/g, '/')
+      const json = JSON.parse(atob(padded)) as { exp?: number }
+      return typeof json.exp === 'number' ? json.exp * 1000 : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * 会话是否真的能用（不只是"本地存着 token"）。
+   *
+   * 路由守卫需要一个比 isAuthenticated 更严格的判断：
+   * token 可能已经过期（写在本机但服务端不认），也可能压根解析不出 exp。
+   * 这两种情况都不该放行到需要登录的页面，否则用户会在画布里看到
+   * 一堆 401 报错却不知道自己该去登录。
+   *
+   * 这里只做本地判断，不发网络请求 —— 守卫是同步的，异步校验会让
+   * 每次跳转都多一个 RTT。真正的权威校验交给接口的 401 响应。
+   */
+  function hasUsableSession(): boolean {
+    const raw = token.value
+    if (!raw) return false
+    const exp = tokenExpiryMs(raw)
+    // 解析不出 exp：保守放行，交给服务端判断，总比把用户挡在门外好。
+    if (exp == null) return true
+    return exp > Date.now()
+  }
+
   function applySession(t: string, u: User) {
     token.value = t
     user.value = u
@@ -62,72 +130,142 @@ export const useAuthStore = defineStore('auth', () => {
     clearMediaHydrateBlobs()
   }
 
+  /** 在途的登录请求。同一时刻只允许一个 POST /auth/login 真正发出。 */
+  let loginPromise: Promise<User> | null = null
+  /** 在途的注册请求。 */
+  let registerPromise: Promise<User> | null = null
+
   async function register(email: string, password: string, displayName?: string, captcha?: CaptchaInput) {
-    loading.value = true
-    error.value = null
+    // single-flight：注册在途时再次调用直接复用同一个请求，避免重复提交。
+    if (registerPromise) return registerPromise
+    const task = (async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const res = await authApi.register({
+          email,
+          password,
+          displayName,
+          captchaId: captcha?.captchaId ?? '',
+          captchaCode: captcha?.captchaCode ?? '',
+        })
+        applySession(res.token, res.user)
+        return res.user
+      } catch (e: unknown) {
+        error.value = friendlyApiMessage(e, '注册失败')
+        throw e
+      } finally {
+        loading.value = false
+      }
+    })()
+    registerPromise = task
     try {
-      const res = await authApi.register({
-        email,
-        password,
-        displayName,
-        captchaId: captcha?.captchaId ?? '',
-        captchaCode: captcha?.captchaCode ?? '',
-      })
-      applySession(res.token, res.user)
-      return res.user
-    } catch (e: unknown) {
-      error.value = friendlyApiMessage(e, '注册失败')
-      throw e
+      return await task
     } finally {
-      loading.value = false
+      if (registerPromise === task) registerPromise = null
     }
   }
 
   async function login(email: string, password: string, captcha?: CaptchaInput) {
-    loading.value = true
-    error.value = null
+    /*
+     * single-flight 守卫：视图层已经有 busy 拦截，但守卫只覆盖"当前视图实例"。
+     * 双击标签页、组件重挂载、或者将来新增的入口都可能绕过它，
+     * 所以在数据层再兜一层：同一时刻的重复登录复用同一个 Promise，
+     * 真正发出去的 POST /auth/login 永远只有一个。
+     */
+    if (loginPromise) return loginPromise
+    const task = (async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const res = await authApi.login({
+          email,
+          password,
+          captchaId: captcha?.captchaId ?? '',
+          captchaCode: captcha?.captchaCode ?? '',
+        })
+        applySession(res.token, res.user)
+        return res.user
+      } catch (e: unknown) {
+        error.value = friendlyApiMessage(e, '登录失败')
+        throw e
+      } finally {
+        loading.value = false
+      }
+    })()
+    loginPromise = task
     try {
-      const res = await authApi.login({
-        email,
-        password,
-        captchaId: captcha?.captchaId ?? '',
-        captchaCode: captcha?.captchaCode ?? '',
-      })
-      applySession(res.token, res.user)
-      return res.user
-    } catch (e: unknown) {
-      error.value = friendlyApiMessage(e, '登录失败')
-      throw e
+      return await task
     } finally {
-      loading.value = false
+      if (loginPromise === task) loginPromise = null
     }
   }
 
-  function tokenExpiryMs(raw: string): number | null {
-    const part = raw.split('.')[1]
-    if (!part) return null
-    try {
-      const padded = part.replace(/-/g, '+').replace(/_/g, '/')
-      const json = JSON.parse(atob(padded)) as { exp?: number }
-      return typeof json.exp === 'number' ? json.exp * 1000 : null
-    } catch {
-      return null
-    }
-  }
+  /** 所有主动刷新和 401 刷新共用这条 single-flight，避免启动、可见性和请求同时刷新。 */
+  let refreshPromise: Promise<void> | null = null
 
-  async function refreshIfNeeded() {
+  async function refreshIfNeeded(force = false): Promise<void> {
+    if (refreshPromise) return refreshPromise
     const raw = token.value
     if (!raw) return
     const exp = tokenExpiryMs(raw)
-    if (exp == null) return
-    const left = exp - Date.now()
+    // 非强制路径遇到无法解析有效期的 token 时保持旧行为，交给服务端权威校验。
+    if (exp == null && !force) return
+    const left = exp == null ? Number.POSITIVE_INFINITY : exp - Date.now()
     if (left <= 0) {
+      // /auth/refresh 仍要求有效 token，过期后再调用只会失败，因此本地确认过期就直接清理。
       clearSession()
       return
     }
-    if (left > 24 * 60 * 60 * 1000) return
-    const res = await authApi.refresh()
-    applySession(res.token, res.user)
+    // 在到期前 24 小时主动续期，避免用户长期开着页面后所有写请求突然 401。
+    if (!force && left > 24 * 60 * 60 * 1000) return
+
+    const tokenAtStart = raw
+    const task = (async () => {
+      try {
+        const res = await authApi.refresh()
+        // 刷新飞行期间用户可能已登出或登录另一个账号，旧响应不得覆盖新会话。
+        if (token.value !== tokenAtStart) return
+        applySession(res.token, res.user)
+      } catch (error) {
+        if (
+          error instanceof ApiError &&
+          (error.status === 401 || error.code === 'invalid_session') &&
+          token.value === tokenAtStart
+        ) {
+          clearSession()
+        }
+        throw error
+      }
+    })()
+    refreshPromise = task
+    try {
+      await task
+    } finally {
+      if (refreshPromise === task) refreshPromise = null
+    }
+  }
+
+  /** 给 HTTP 的 401 重放钩子；暂时性故障必须保留 token，让用户联网后继续工作。 */
+  async function refreshAfterUnauthorized(): Promise<UnauthorizedRefreshResult> {
+    if (!token.value) return 'invalid'
+    try {
+      await refreshIfNeeded(true)
+      return token.value ? 'refreshed' : 'invalid'
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.code === 'invalid_session')) {
+        clearSession()
+        return 'invalid'
+      }
+      return 'unavailable'
+    }
+  }
+
+  function isInvalidSessionError(error: unknown): boolean {
+    return (
+      error instanceof ApiError &&
+      (error.status === 401 || error.code === 'invalid_session')
+    )
   }
 
   async function fetchMe() {
@@ -143,8 +281,9 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = u
       writeCachedUser(u)
       return u
-    } catch {
-      clearSession()
+    } catch (error) {
+      // 断网、超时、500 只表示本次校验失败，不等于服务端宣布会话无效。
+      if (isInvalidSessionError(error)) clearSession()
       return null
     } finally {
       loading.value = false
@@ -165,12 +304,38 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
+    // 先告诉服务端「我退出了」，让活动日志记下这一条；失败也不阻塞本地清理。
+    if (token.value) {
+      void logsApi.logoutRemote().catch(() => undefined)
+    }
     clearSession()
   }
 
-  if (typeof window !== 'undefined') {
-    window.addEventListener('metamatrix:auth:logout', () => clearSession())
+  function onVisibilityChange(): void {
+    if (document.visibilityState !== 'visible') return
+    // 后台标签页可能休眠数小时，重新可见时先按有效期续期；失败只保留会话等待下次。
+    void refreshIfNeeded().catch(() => undefined)
   }
+
+  function onGlobalLogout(): void {
+    clearSession()
+  }
+
+  const unregisterUnauthorizedHandler = setUnauthorizedHandler(refreshAfterUnauthorized)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('metamatrix:auth:logout', onGlobalLogout)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  }
+  // 应用启动也可能直接命中临近过期的缓存 token，与页面可见路径共用 single-flight。
+  if (token.value) void refreshIfNeeded().catch(() => undefined)
+
+  onScopeDispose(() => {
+    unregisterUnauthorizedHandler()
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('metamatrix:auth:logout', onGlobalLogout)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  })
 
   return {
     token,
@@ -178,8 +343,11 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     error,
     isAuthenticated,
+    currentUserId,
+    hasUsableSession,
     register,
     login,
+    refreshIfNeeded,
     fetchMe,
     changePassword,
     logout,

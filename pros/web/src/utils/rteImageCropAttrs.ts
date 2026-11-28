@@ -98,6 +98,21 @@ export function cropAttrsStyle(attrs: Record<string, unknown> | null | undefined
   return cropStyle(readCropFromAttrs(attrs))
 }
 
+/** 写进 img style 属性的声明。没有裁剪时返回空字符串。已有宽度时不再改成 100%。 */
+export function cropHtmlStyle(attrs: Record<string, unknown> | null | undefined): string {
+  const style = cropAttrsStyle(attrs)
+  if (!style['object-fit']) return ''
+  const raw = attrs || {}
+  const sized = String(raw.displayWidth || '').trim() || (raw.width != null && raw.width !== '')
+  const parts: string[] = []
+  if (style['aspect-ratio'] && !sized) parts.push('width: 100%', 'height: auto', 'max-width: 100%')
+  parts.push(`object-fit: ${style['object-fit']}`)
+  if (style['aspect-ratio']) parts.push(`aspect-ratio: ${style['aspect-ratio']}`)
+  if (style['object-position']) parts.push(`object-position: ${style['object-position']}`)
+  if (style.transform) parts.push(style.transform.replace(/;$/, ''))
+  return parts.join('; ')
+}
+
 /** 由预设生成裁剪参数。 */
 export function cropFromPreset(preset: CropPreset): ImageCrop {
   return normalizeImageCrop({

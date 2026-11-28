@@ -36,6 +36,29 @@
   line-height: 1.55;
 }
 
+.canvas-viewport .sheet[aria-label='利润表'] .sheet-top p,
+.canvas-viewport .cash[aria-label='现金流量'] .cash-top p,
+.canvas-viewport .sheet[aria-label='RICE 排序'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='PDCA'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='波特五力'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='SWOT 分析'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='价值链'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='黄金圈'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='麦肯锡 7S'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='盈亏平衡'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='卡诺模型'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='MoSCoW'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='VRIO'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='制胜选择'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='客户旅程'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='精益画布'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='价值主张画布'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='SOAR'] .sheet-top p,
+.canvas-viewport .raci[aria-label='RACI 责任矩阵'] .raci-top p {
+  font-size: 15px;
+  color: #3c4043;
+}
+
 .canvas-viewport .sheet-top,
 .canvas-viewport .cash-top,
 .canvas-viewport .raci-top,
@@ -87,12 +110,97 @@
   box-shadow: 0 12px 32px rgba(62, 48, 28, 0.08);
 }
 
-.canvas-viewport .lean-grid,
 .canvas-viewport .bmc-grid,
-.canvas-viewport .raci-sheet,
-.canvas-viewport .sheet .table,
+.canvas-viewport .gantt .split,
 .canvas-viewport .quadrant-grid {
   overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .canvas-viewport .bmc-grid.bmc-grid {
+    min-width: 0;
+    overflow: visible;
+  }
+}
+
+.canvas-viewport .raci-sheet {
+  overflow: auto;
+}
+
+/* 格子按内容增高，页面自己滚。不要把多出来的字裁在视口里。 */
+.canvas-viewport .sheet,
+.canvas-viewport .bmc {
+  overflow: auto;
+}
+
+.canvas-viewport .lean-grid,
+.canvas-viewport .sheet > .grid,
+.canvas-viewport .sheet > .axis,
+.canvas-viewport .sheet > .vpc {
+  flex: 1 0 auto;
+  min-height: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* 标题在网格外面。网格用剩余高度撑满，内容再高时整页滚动，不要按整页 100% 把标题再加一遍。 */
+.canvas-viewport .sheet > .forces,
+.canvas-viewport .sheet > .chain,
+.canvas-viewport .sheet > .pdca,
+.canvas-viewport .sheet > .columns,
+.canvas-viewport .cash > .cash-grid,
+.canvas-viewport .swot-grid,
+.canvas-viewport .sheet > .rings,
+.canvas-viewport .sheet[aria-label='麦肯锡 7S'] > .grid,
+.canvas-viewport .sheet[aria-label='盈亏平衡'] > .grid,
+.canvas-viewport .sheet[aria-label='卡诺模型'] > .grid,
+.canvas-viewport .sheet[aria-label='MoSCoW'] > .grid,
+.canvas-viewport .sheet[aria-label='VRIO'] > .grid,
+.canvas-viewport .sheet[aria-label='制胜选择'] > .grid,
+.canvas-viewport .sheet[aria-label='客户旅程'] > .grid {
+  flex: 1 0 auto;
+  min-height: 0;
+  height: auto;
+  overflow: visible;
+}
+
+.canvas-viewport .forces {
+  grid-template-rows: minmax(160px, 0.85fr) minmax(200px, 1.2fr) minmax(160px, 0.85fr);
+}
+
+.canvas-viewport .chain .row {
+  flex: 1 0 auto;
+  min-height: 180px;
+  height: auto;
+  overflow: visible;
+}
+
+.canvas-viewport .swot-grid > section,
+.canvas-viewport .lean-cell,
+.canvas-viewport .sheet > .grid > section,
+.canvas-viewport .sheet > .axis .grid > section,
+.canvas-viewport .vpc .side,
+.canvas-viewport .vpc .stack,
+.canvas-viewport .vpc article,
+.canvas-viewport .rings,
+.canvas-viewport .ring,
+.canvas-viewport .sheet > .columns > section,
+.canvas-viewport .sheet > .columns .lines,
+.canvas-viewport .forces .force,
+.canvas-viewport .forces .rte-slot,
+.canvas-viewport .chain section,
+.canvas-viewport .chain .rte-slot,
+.canvas-viewport .pdca > section,
+.canvas-viewport .pdca .rte-slot,
+.canvas-viewport .swot-grid .rte-slot,
+.canvas-viewport .lean-grid .rte-slot,
+.canvas-viewport .sheet > .grid .rte-slot,
+.canvas-viewport .sheet > .axis .rte-slot,
+.canvas-viewport .vpc .rte-slot,
+.canvas-viewport .rings .rte-slot {
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
 }
 
 .canvas-viewport .kanban article {
@@ -177,4 +285,102 @@
 
 .canvas-viewport .gantt .zoom button:last-child {
   border-radius: 0 999px 999px 0;
+}
+
+/* 画布里的紧凑编辑器默认 12px，格子里读起来费劲。 */
+.canvas-viewport .rte-root.compact .ProseMirror,
+.canvas-viewport .rte-root.compact .tiptap {
+  font-size: 15px !important;
+  line-height: 1.7 !important;
+}
+
+/* 空格子要能看清「写在这里」。各画布自己的占位色偏灰，盖在浅色底上会消失。 */
+.canvas-viewport .is-empty::before,
+.canvas-viewport .is-editor-empty::before,
+.canvas-viewport p.is-empty::before,
+.canvas-viewport p.is-editor-empty::before {
+  color: #5c564c !important;
+}
+
+.canvas-viewport textarea::placeholder,
+.canvas-viewport input::placeholder {
+  color: #5c564c;
+  opacity: 1;
+}
+
+.canvas-viewport :focus-visible {
+  outline: 2px solid var(--cv-focus, #163044) !important;
+  outline-offset: 2px;
+}
+
+/* 格子里先写字。整条工具栏会把窄格子撑成好几行，格式放到放大编辑里。 */
+.canvas-viewport .rte-root .rte-toolbar,
+.canvas-viewport .rte-root .rte-bottom {
+  display: none;
+}
+
+/* 编辑区融进格子底色，不再套一层白框。放大层在视口外面，仍是白纸。 */
+.canvas-viewport .rte-root.rte-root {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* 窄屏多列会挤成一行几个字。改成上下排列，格子仍保持可写的高度。 */
+@media (max-width: 800px) {
+  .canvas-viewport .sheet > .grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .canvas-viewport .sheet > .grid > section {
+    min-height: 240px;
+  }
+
+  .canvas-viewport .swot-grid.swot-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .canvas-viewport .forces.forces {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .canvas-viewport .forces .force {
+    grid-area: auto;
+    min-height: 240px;
+  }
+
+  .canvas-viewport .swot-grid > section,
+  .canvas-viewport .forces .force {
+    min-height: 240px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .canvas-viewport .sheet > .pdca.pdca {
+    grid-template-columns: 1fr;
+  }
+
+  .canvas-viewport .chain .row--support.row--support,
+  .canvas-viewport .chain .row--primary.row--primary {
+    grid-template-columns: 1fr;
+  }
+
+  .canvas-viewport .pdca > section,
+  .canvas-viewport .chain section {
+    min-height: 240px;
+  }
+}
+
+.canvas-viewport .rte-root .rte-canvas,
+.canvas-viewport .rte-root .rte-body {
+  background: transparent;
+}
+
+/* 放大是排版入口，平时也要看得见。各画布原来把按钮藏到悬停才出现。 */
+.canvas-viewport .ym-block > .ym-block-toolbar.ym-block-toolbar {
+  opacity: 0.92;
 }

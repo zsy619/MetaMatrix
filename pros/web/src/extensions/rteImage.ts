@@ -1,12 +1,178 @@
 import Image from '@tiptap/extension-image'
 import { mergeAttributes } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
 import { createImageDragPlugin } from './rteImageDrag'
 import { createImageCaptionPlugin } from './rteImageCaption'
 import { createCaptionRenumberPlugin } from '../utils/rteCaptionNumber'
-import { normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
-import { cropAttrsStyle } from '../utils/rteImageCropAttrs'
+import { imageLinkHref, imageSizeStyle, normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
+import { cropHtmlStyle } from '../utils/rteImageCropAttrs'
+import { applyMediaBlobToElement, installMediaSrcResolver, mediaBlobs } from './mediaHydrateState'
 
 export type RteImageAlign = 'left' | 'center' | 'right' | null
+
+/** 裁剪样式和当前属性的 HTML 一起返回。编辑器节点视图只认属性 renderHTML，不会再走节点 renderHTML。 */
+function withCropStyle(attrs: Record<string, unknown>, extra: Record<string, string>): Record<string, string> {
+  const style = cropHtmlStyle(attrs)
+  return style ? { ...extra, style } : extra
+}
+
+function percentWidthAttr(raw: string): string | null {
+  const text = raw.trim().normalize('NFKC').replace(/\s+/g, '').replace(/，/g, '.').replace(/,/g, '.')
+  return /^\d+(\.\d+)?%$/.test(text) ? text : null
+}
+
+function pixelAttr(raw: string): number | null {
+  const text = raw
+    .trim()
+    .normalize('NFKC')
+    .replace(/，/g, '.')
+    .replace(/,/g, '.')
+    .replace(/\s*!important\s*;?$/i, '')
+    .replace(/;+\s*$/, '')
+  const point = /^(\d+(?:\.\d+)?)\s*pt$/i.exec(text)
+  if (point) {
+    const n = Number(point[1]) * 4 / 3
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const milli = /^(\d+(?:\.\d+)?)\s*mm$/i.exec(text)
+  if (milli) {
+    const n = Number(milli[1]) * 96 / 25.4
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const centi = /^(\d+(?:\.\d+)?)\s*cm$/i.exec(text)
+  if (centi) {
+    const n = Number(centi[1]) * 96 / 2.54
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const inch = /^(\d+(?:\.\d+)?)\s*in$/i.exec(text)
+  if (inch) {
+    const n = Number(inch[1]) * 96
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const pica = /^(\d+(?:\.\d+)?)\s*pc$/i.exec(text)
+  if (pica) {
+    const n = Number(pica[1]) * 16
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const quarter = /^(\d+(?:\.\d+)?)\s*q$/i.exec(text)
+  if (quarter) {
+    const n = (Number(quarter[1]) * 24) / 25.4
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const rootEm = /^(\d+(?:\.\d+)?)\s*rem$/i.exec(text)
+  if (rootEm) {
+    const n = Number(rootEm[1]) * 16
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const em = /^(\d+(?:\.\d+)?)\s*em$/i.exec(text)
+  if (em) {
+    const n = Number(em[1]) * 16
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const ch = /^(\d+(?:\.\d+)?)\s*ch$/i.exec(text)
+  if (ch) {
+    const n = Number(ch[1]) * 8
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const rootCh = /^(\d+(?:\.\d+)?)\s*rch$/i.exec(text)
+  if (rootCh) {
+    const n = Number(rootCh[1]) * 8
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const ex = /^(\d+(?:\.\d+)?)\s*ex$/i.exec(text)
+  if (ex) {
+    const n = Number(ex[1]) * 8
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const rootEx = /^(\d+(?:\.\d+)?)\s*rex$/i.exec(text)
+  if (rootEx) {
+    const n = Number(rootEx[1]) * 8
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const ideo = /^(\d+(?:\.\d+)?)\s*ic$/i.exec(text)
+  if (ideo) {
+    const n = Number(ideo[1]) * 16
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const rootIdeo = /^(\d+(?:\.\d+)?)\s*ric$/i.exec(text)
+  if (rootIdeo) {
+    const n = Number(rootIdeo[1]) * 16
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const line = /^(\d+(?:\.\d+)?)\s*lh$/i.exec(text)
+  if (line) {
+    const n = Number(line[1]) * 24
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const rootLine = /^(\d+(?:\.\d+)?)\s*rlh$/i.exec(text)
+  if (rootLine) {
+    const n = Number(rootLine[1]) * 24
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const cap = /^(\d+(?:\.\d+)?)\s*cap$/i.exec(text)
+  if (cap) {
+    const n = (Number(cap[1]) * 56) / 5
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const rootCap = /^(\d+(?:\.\d+)?)\s*rcap$/i.exec(text)
+  if (rootCap) {
+    const n = (Number(rootCap[1]) * 56) / 5
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const pxWord = /^(\d+(?:\.\d+)?)\s*像素$/.exec(text)
+  if (pxWord) {
+    const n = Number(pxWord[1])
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const pointWord = /^(\d+(?:\.\d+)?)\s*磅$/.exec(text)
+  if (pointWord) {
+    const n = (Number(pointWord[1]) * 4) / 3
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const milliWord = /^(\d+(?:\.\d+)?)\s*毫米$/.exec(text)
+  if (milliWord) {
+    const n = (Number(milliWord[1]) * 96) / 25.4
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const centiWord = /^(\d+(?:\.\d+)?)\s*厘米$/.exec(text)
+  if (centiWord) {
+    const n = (Number(centiWord[1]) * 96) / 2.54
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const inchWord = /^(\d+(?:\.\d+)?)\s*英寸$/.exec(text)
+  if (inchWord) {
+    const n = Number(inchWord[1]) * 96
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const gongfen = /^(\d+(?:\.\d+)?)\s*公分$/.exec(text)
+  if (gongfen) {
+    const n = (Number(gongfen[1]) * 96) / 2.54
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const px = text.replace(/\s*px$/i, '')
+  if (!px || /%/.test(px)) return null
+  const n = Number(px)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+}
+
+function styleDecl(style: string, prop: string): string {
+  const match = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, 'i').exec(style)
+  return (match?.[1] || '').trim()
+}
+
+/** 粘贴进来的边框、圆角和阴影。拒绝 url()，避免把外部图塞进样式。 */
+function imageDecor(value: string): string | null {
+  const text = value.trim()
+  if (!text || text.length > 120 || /url\(|expression\(|javascript:/i.test(text)) return null
+  if (text === 'none' || text === '0') return null
+  return text
+}
+
+function pastedDecor(el: HTMLElement, attr: string, prop: string, cssom: string): string | null {
+  const style = el.getAttribute('style') || ''
+  return imageDecor(el.getAttribute(attr) || '') || imageDecor(styleDecl(style, prop)) || imageDecor(cssom)
+}
 
 /**
  * 图片增强：对齐（data-align）+ 题注（caption / title）。
@@ -21,6 +187,25 @@ export const RteImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      height: {
+        default: null as number | null,
+        parseHTML: (el: HTMLElement) => {
+          if (percentWidthAttr(el.getAttribute('width') || '')) return null
+          return pixelAttr(el.getAttribute('height') || '')
+        },
+        renderHTML: (attrs: { height?: number | null }) => {
+          const n = Number(attrs.height)
+          return Number.isFinite(n) && n > 0 ? { height: String(Math.round(n)) } : {}
+        },
+      },
+      width: {
+        default: null as number | null,
+        parseHTML: (el: HTMLElement) => pixelAttr(el.getAttribute('width') || ''),
+        renderHTML: (attrs: { width?: number | null }) => {
+          const n = Number(attrs.width)
+          return Number.isFinite(n) && n > 0 ? { width: String(Math.round(n)) } : {}
+        },
+      },
       align: {
         default: 'center' as RteImageAlign,
         parseHTML: (el: HTMLElement) => normalizeImageAlign(el.getAttribute('data-align')),
@@ -70,11 +255,26 @@ export const RteImage = Image.extend({
       fit: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => {
-          const value = el.getAttribute('data-fit')
-          return value === 'cover' || value === 'contain' ? value : null
+          const value = (el.getAttribute('data-fit') || styleDecl(el.getAttribute('style') || '', 'object-fit') || el.style?.objectFit || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s*!important$/i, '')
+            .trim()
+          return value === 'cover' || value === 'contain' || value === 'scale-down' || value === 'fill' || value === 'none' ? value : null
         },
         renderHTML: (attrs: { fit?: string | null }) =>
-          attrs.fit === 'cover' || attrs.fit === 'contain' ? { 'data-fit': attrs.fit } : {},
+          attrs.fit === 'cover' || attrs.fit === 'contain' || attrs.fit === 'scale-down' || attrs.fit === 'fill' || attrs.fit === 'none'
+            ? { 'data-fit': attrs.fit, style: `object-fit: ${attrs.fit}` }
+            : {},
+      },
+      href: {
+        default: null as string | null,
+        parseHTML: (el: HTMLElement) =>
+          imageLinkHref(el.getAttribute('data-href') || el.closest('a')?.getAttribute('href') || ''),
+        renderHTML: (attrs: { href?: string | null }) => {
+          const value = imageLinkHref(attrs.href)
+          return value ? { 'data-href': value } : {}
+        },
       },
       caption: {
         default: null as string | null,
@@ -94,11 +294,13 @@ export const RteImage = Image.extend({
       displayWidth: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => {
-          const w =
-            el.getAttribute('data-display-width') ||
-            (el.style?.width || '').trim() ||
-            null
-          return w || null
+          const explicit = (el.getAttribute('data-display-width') || '').trim()
+          if (explicit) return explicit
+          // 裁剪会自己写 width:100%，不能当成用户设过的显示宽度。
+          if (el.getAttribute('data-crop-aspect')) return null
+          const attrWidth = percentWidthAttr(el.getAttribute('width') || '')
+          if (attrWidth) return attrWidth
+          return (el.style?.width || '').trim() || null
         },
         renderHTML: (attrs: { displayWidth?: string | null }) => {
           const w = (attrs.displayWidth || '').trim()
@@ -108,8 +310,7 @@ export const RteImage = Image.extend({
       },
       borderRadius: {
         default: null as string | null,
-        parseHTML: (el: HTMLElement) =>
-          el.getAttribute('data-radius') || (el.style?.borderRadius || '').trim() || null,
+        parseHTML: (el: HTMLElement) => pastedDecor(el, 'data-radius', 'border-radius', el.style?.borderRadius || ''),
         renderHTML: (attrs: { borderRadius?: string | null }) => {
           const v = (attrs.borderRadius || '').trim()
           if (!v) return {}
@@ -118,8 +319,7 @@ export const RteImage = Image.extend({
       },
       boxShadow: {
         default: null as string | null,
-        parseHTML: (el: HTMLElement) =>
-          el.getAttribute('data-shadow') || (el.style?.boxShadow || '').trim() || null,
+        parseHTML: (el: HTMLElement) => pastedDecor(el, 'data-shadow', 'box-shadow', el.style?.boxShadow || ''),
         renderHTML: (attrs: { boxShadow?: string | null }) => {
           const v = (attrs.boxShadow || '').trim()
           if (!v) return {}
@@ -128,7 +328,7 @@ export const RteImage = Image.extend({
       },
       borderStyle: {
         default: null as string | null,
-        parseHTML: (el: HTMLElement) => el.getAttribute('data-border') || null,
+        parseHTML: (el: HTMLElement) => pastedDecor(el, 'data-border', 'border', el.style?.border || ''),
         renderHTML: (attrs: { borderStyle?: string | null }) => {
           const v = (attrs.borderStyle || '').trim()
           if (!v) return {}
@@ -138,10 +338,9 @@ export const RteImage = Image.extend({
       cropAspect: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => el.getAttribute('data-crop-aspect') || null,
-        renderHTML: (attrs: { cropAspect?: string | null }) => {
-          const v = (attrs.cropAspect || '').trim()
-          if (!v) return {}
-          return { 'data-crop-aspect': v }
+        renderHTML: (attrs: Record<string, unknown>) => {
+          const v = String(attrs.cropAspect || '').trim()
+          return withCropStyle(attrs, v ? { 'data-crop-aspect': v } : {})
         },
       },
       cropFocusX: {
@@ -152,9 +351,9 @@ export const RteImage = Image.extend({
           const n = Number(raw)
           return Number.isFinite(n) ? n : null
         },
-        renderHTML: (attrs: { cropFocusX?: number | null }) => {
+        renderHTML: (attrs: Record<string, unknown>) => {
           if (attrs.cropFocusX == null) return {}
-          return { 'data-crop-focus-x': String(attrs.cropFocusX) }
+          return withCropStyle(attrs, { 'data-crop-focus-x': String(attrs.cropFocusX) })
         },
       },
       cropFocusY: {
@@ -165,9 +364,9 @@ export const RteImage = Image.extend({
           const n = Number(raw)
           return Number.isFinite(n) ? n : null
         },
-        renderHTML: (attrs: { cropFocusY?: number | null }) => {
+        renderHTML: (attrs: Record<string, unknown>) => {
           if (attrs.cropFocusY == null) return {}
-          return { 'data-crop-focus-y': String(attrs.cropFocusY) }
+          return withCropStyle(attrs, { 'data-crop-focus-y': String(attrs.cropFocusY) })
         },
       },
       cropZoom: {
@@ -178,29 +377,137 @@ export const RteImage = Image.extend({
           const n = Number(raw)
           return Number.isFinite(n) ? n : null
         },
-        renderHTML: (attrs: { cropZoom?: number | null }) => {
+        renderHTML: (attrs: Record<string, unknown>) => {
           if (attrs.cropZoom == null) return {}
-          return { 'data-crop-zoom': String(attrs.cropZoom) }
+          return withCropStyle(attrs, { 'data-crop-zoom': String(attrs.cropZoom) })
         },
       },
     }
   },
 
-  renderHTML({ HTMLAttributes }) {
-    // 裁剪效果落到 style 上：object-fit / object-position / scale。
-    // 已有 style（宽度等）要保留，所以合并而不是覆盖。
-    const crop = cropAttrsStyle(HTMLAttributes as Record<string, unknown>)
+  renderHTML({ node, HTMLAttributes }) {
+    // 属性 renderHTML 已经把裁剪写进 style。这里再补一次，避免只走 toDOM 时丢掉。
+    const crop = cropHtmlStyle(node?.attrs as Record<string, unknown>)
     const attrs = HTMLAttributes as Record<string, unknown>
-    if (crop['object-fit']) {
-      const prev = typeof attrs.style === 'string' ? attrs.style : ''
-      attrs.style = [prev, `object-fit: ${crop['object-fit']}`].filter(Boolean).join('; ')
-      if (crop['object-position']) attrs.style += `; object-position: ${crop['object-position']}`
-      if (crop.transform) attrs.style += `; ${crop.transform}`
-    }
+    const prev = typeof attrs.style === 'string' ? attrs.style : ''
+    if (crop && !prev.includes('object-fit')) attrs.style = [prev, crop].filter(Boolean).join('; ')
     return ['img', mergeAttributes(this.options.HTMLAttributes, attrs)]
   },
 
   addProseMirrorPlugins() {
-    return [...(this.parent?.() || []), createImageDragPlugin(), createImageCaptionPlugin(), createCaptionRenumberPlugin()]
+    return [...(this.parent?.() || []), createImageDragPlugin(), createImageCaptionPlugin(), createCaptionRenumberPlugin(), createImageSizePlugin()]
+  },
+
+  /**
+   * 接管 TipTap 的图片节点视图，给 <img> 装上素材库地址解析器。
+   *
+   * TipTap 的节点视图每次更新节点都会执行 `el.src = 节点属性里的 /media/{id}`，
+   * 会把 mediaHydrate 已经换好的 blob 地址冲掉，图片于是又变回裂图
+   * （浏览器去站点域名取回的是 index.html，不是图片）。
+   * 装了解析器之后，写入 /media/{id} 会被自动换成缓存里的 blob。
+   */
+  addNodeView() {
+    const parent = this.parent?.() as ((props: unknown) => any) | null | undefined
+    if (!parent) return null
+    return (props: unknown) => {
+      const view = parent(props) as any
+      if (!view) return view
+      const img = (view.dom as HTMLElement | undefined)?.querySelector?.('img') as HTMLImageElement | null
+      if (img) {
+        installMediaSrcResolver(img)
+        const raw = String((props as any)?.node?.attrs?.src ?? '')
+        const cached = raw ? mediaBlobs.get(raw) : undefined
+        if (cached) applyMediaBlobToElement(img, raw, cached)
+      }
+      const originalUpdate = typeof view.update === 'function' ? view.update.bind(view) : null
+      if (originalUpdate) {
+        view.update = (node: any, decorations: any, innerDecorations: any) => {
+          const result = originalUpdate(node, decorations, innerDecorations)
+          const el = (view.dom as HTMLElement | undefined)?.querySelector?.('img') as HTMLImageElement | null
+          const raw = String(node?.attrs?.src ?? '')
+          const cached = raw ? mediaBlobs.get(raw) : undefined
+          if (el && cached) applyMediaBlobToElement(el, raw, cached)
+          return result
+        }
+      }
+      return view
+    }
   },
 })
+
+const IMAGE_SIZE_SYNC = 'imageSizeSync'
+
+function paintImageSizes(view: EditorView) {
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return
+    const dom = view.nodeDOM(pos)
+    const img = dom instanceof HTMLImageElement ? dom : dom instanceof HTMLElement ? dom.querySelector('img') : null
+    if (!(img instanceof HTMLImageElement)) return
+    const next = imageSizeStyle(node.attrs)
+    if (img.style.width !== next.width) img.style.width = next.width
+    if (img.style.height !== next.height) img.style.height = next.height
+  })
+}
+
+function clearPixelVersusPreset(view: EditorView) {
+  const fixes: number[] = []
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image' || !node.attrs.displayWidth) return
+    const width = Number(node.attrs.width)
+    const height = Number(node.attrs.height)
+    if ((Number.isFinite(width) && width > 0) || (Number.isFinite(height) && height > 0)) fixes.push(pos)
+  })
+  if (!fixes.length) return
+  let tr = view.state.tr
+  for (let index = fixes.length - 1; index >= 0; index -= 1) {
+    const pos = tr.mapping.map(fixes[index]!)
+    const node = tr.doc.nodeAt(pos)
+    if (!node || node.type.name !== 'image') continue
+    tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, displayWidth: null })
+  }
+  if (tr.docChanged) {
+    tr.setMeta(IMAGE_SIZE_SYNC, true)
+    view.dispatch(tr)
+  }
+}
+
+/** 拖拽写入像素宽高后，清掉百分比，避免松手又弹回预设。 */
+function createImageSizePlugin(): Plugin {
+  return new Plugin({
+    appendTransaction(transactions, _old, state) {
+      if (!transactions.some((tr) => tr.docChanged)) return null
+      if (transactions.some((tr) => tr.getMeta(IMAGE_SIZE_SYNC))) return null
+      const fixes: number[] = []
+      state.doc.descendants((node, pos) => {
+        if (node.type.name !== 'image') return
+        const width = Number(node.attrs.width)
+        const height = Number(node.attrs.height)
+        const sized = (Number.isFinite(width) && width > 0) || (Number.isFinite(height) && height > 0)
+        if (sized && node.attrs.displayWidth) fixes.push(pos)
+      })
+      if (!fixes.length) return null
+      let tr = state.tr
+      for (let index = fixes.length - 1; index >= 0; index -= 1) {
+        const pos = tr.mapping.map(fixes[index]!)
+        const node = tr.doc.nodeAt(pos)
+        if (!node || node.type.name !== 'image') continue
+        tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, displayWidth: null })
+      }
+      tr.setMeta(IMAGE_SIZE_SYNC, true)
+      return tr.docChanged ? tr : null
+    },
+    view(editorView) {
+      const reconcile = () => {
+        if (!editorView.dom?.isConnected) return
+        clearPixelVersusPreset(editorView)
+        paintImageSizes(editorView)
+      }
+      queueMicrotask(reconcile)
+      return {
+        update() {
+          queueMicrotask(reconcile)
+        },
+      }
+    },
+  })
+}

@@ -41,12 +41,13 @@ const emit = defineEmits<{
     <div class="rte-outline-head">
       <span class="rte-outline-title">评论</span>
       <span class="rte-comment-count">{{ unresolvedCount }} 条未解决</span>
-      <button type="button" class="rte-outline-close" aria-label="关闭评论" @click="emit('close')">×</button>
+      <button type="button" class="rte-outline-close" title="收起评论栏" aria-label="收起评论栏" @click="emit('close')">×</button>
     </div>
     <label class="rte-comment-resolved-toggle">
       <input
         type="checkbox"
         :checked="showResolved"
+        title="把已解决的讨论也列出来"
         @change="emit('update:showResolved', ($event.target as HTMLInputElement).checked)"
       />
       显示已解决
@@ -55,6 +56,7 @@ const emit = defineEmits<{
       <input
         type="checkbox"
         :checked="orphansOnly"
+        title="只看原文已经对不上的评论"
         @change="emit('update:orphansOnly', ($event.target as HTMLInputElement).checked)"
       />
       只看失锚
@@ -71,8 +73,8 @@ const emit = defineEmits<{
         @input="emit('update:draftBody', ($event.target as HTMLTextAreaElement).value)"
       />
       <div class="rte-comment-actions">
-        <button type="button" class="rte-comment-btn" @click="emit('cancelDraft')">取消</button>
-        <button type="button" class="rte-comment-btn is-primary" @click="emit('submitDraft')">发送</button>
+        <button type="button" class="rte-comment-btn" title="不发送这条评论" @click="emit('cancelDraft')">取消</button>
+        <button type="button" class="rte-comment-btn is-primary" title="把评论留在选中的文字上" @click="emit('submitDraft')">发送</button>
       </div>
     </div>
     <p v-if="!threads.length" class="rte-outline-empty">{{ orphansOnly ? '没有失锚的评论。' : '还没有评论。选中文字后点「评论」，讨论会留在这条画布里。' }}</p>
@@ -83,7 +85,7 @@ const emit = defineEmits<{
         class="rte-comment-card"
         :class="{ 'is-active': thread.id === activeThreadId, 'is-resolved': thread.resolved }"
       >
-        <button type="button" class="rte-comment-quote is-jump" @click="emit('jump', thread.id)">
+        <button type="button" class="rte-comment-quote is-jump" title="滚到这条评论对应的原文" @click="emit('jump', thread.id)">
           <span v-if="orphanIds?.includes(thread.id)">失锚 · </span>{{ thread.quote || '原文已不在' }}
         </button>
         <ul class="rte-comment-messages">
@@ -96,6 +98,7 @@ const emit = defineEmits<{
                 v-if="editable && message.authorId === author.id"
                 type="button"
                 class="rte-comment-link"
+                title="删掉我写的这条"
                 @click="emit('removeMessage', thread.id, message.id)"
               >
                 删除
@@ -109,11 +112,12 @@ const emit = defineEmits<{
             v-if="orphanIds?.includes(thread.id)"
             type="button"
             class="rte-comment-btn"
+            title="先选中一段文字，再把这条评论钉上去"
             @click="emit('reanchor', thread.id)"
           >
             重新钉住
           </button>
-          <button type="button" class="rte-comment-btn" @click="emit('toggleResolved', thread)">
+          <button type="button" class="rte-comment-btn" :title="thread.resolved ? '重新打开这条讨论' : '标成已解决'" @click="emit('toggleResolved', thread)">
             {{ thread.resolved ? '重新打开' : '解决' }}
           </button>
         </div>
@@ -127,7 +131,7 @@ const emit = defineEmits<{
             :aria-label="'回复 ' + (thread.quote || '评论')"
             @input="emit('update:reply', thread.id, ($event.target as HTMLTextAreaElement).value)"
           />
-          <button type="button" class="rte-comment-btn is-primary" @click="emit('submitReply', thread.id)">回复</button>
+          <button type="button" class="rte-comment-btn is-primary" title="回复这条讨论" @click="emit('submitReply', thread.id)">回复</button>
         </div>
       </article>
     </div>

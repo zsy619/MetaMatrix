@@ -1,0 +1,77 @@
+{
+  "id": "canvas_scene_three_high",
+  "type": "scene_three_high",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "kicker": "STEP 1 · 选场景",
+  "title": "三高：高频、高价值、高边际成本",
+  "verdict": "判断动作：把你要做的那件事按三高打分，三项都到 70 分以上，才进下一步。",
+  "passScore": 70,
+  "axes": [
+    {
+      "id": "frequency",
+      "title": "高频",
+      "headline": "一周至少三次",
+      "body": "高频才会被反复校准。一个月做一次的事，做成了也没人记得怎么用。"
+    },
+    {
+      "id": "value",
+      "title": "高价值",
+      "headline": "单次耗得起时间",
+      "body": "这件事本身值得花 30 分钟以上。3 分钟的事，AI 省下来的时间不够培训成本。"
+    },
+    {
+      "id": "marginal",
+      "title": "高边际成本",
+      "headline": "多一个人，就多一份贵",
+      "body": "靠加人才能撑规模的环节，才是 AI 真正能把曲线掰弯的地方。"
+    }
+  ],
+  "businesses": [
+    {
+      "id": "biz_quote",
+      "name": "销售报价",
+      "color": "rgba(212, 175, 55, 0.38)",
+      "stroke": "#c9a227",
+      "scores": { "frequency": 90, "value": 80, "marginal": 80 },
+      "note": "每周大量报价，单次大约半小时，销售编制随单量涨。"
+    },
+    {
+      "id": "biz_ticket",
+      "name": "客服工单",
+      "color": "rgba(77, 182, 172, 0.42)",
+      "stroke": "#26a69a",
+      "scores": { "frequency": 100, "value": 70, "marginal": 90 },
+      "note": "每天反复发生。复杂工单耗得起时间，客服人数跟着工单量走。"
+    },
+    {
+      "id": "biz_knowledge",
+      "name": "内部知识问答",
+      "color": "rgba(66, 133, 244, 0.32)",
+      "stroke": "#1a73e8",
+      "scores": { "frequency": 80, "value": 40, "marginal": 30 },
+      "note": "问得勤，但单次往往只有几分钟，不靠加人才能撑住。"
+    },
+    {
+      "id": "biz_expense",
+      "name": "报销审核",
+      "color": "rgba(234, 67, 53, 0.28)",
+      "stroke": "#d93025",
+      "scores": { "frequency": 60, "value": 70, "marginal": 70 },
+      "note": "单次够长，财务加人就贵。很多团队一周还到不了三次。"
+    },
+    {
+      "id": "biz_compliance",
+      "name": "合规审查",
+      "color": "rgba(142, 68, 173, 0.3)",
+      "stroke": "#8e44ad",
+      "scores": { "frequency": 30, "value": 90, "marginal": 50 },
+      "note": "单次很值钱，但一月才几次。出错代价高，不能当第一个试点。"
+    }
+  ]
+}
