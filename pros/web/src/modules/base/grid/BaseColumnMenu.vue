@@ -16,12 +16,13 @@ import {
   Filter,
   Hide,
   Lock,
+  Refresh,
   Setting,
   Sort,
   Unlock,
 } from "@element-plus/icons-vue";
 import { fieldTypeIcon, fieldTypeColor } from "../fields/icons";
-import { fieldPlugin } from "../fields/registry";
+import { fieldPlugin, isSnapshotField } from "../fields/registry";
 import type { FieldMeta } from "../types";
 
 const props = defineProps<{
@@ -36,6 +37,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "sort", payload: { fieldId: string; order: "asc" | "desc" }): void;
+  /** 重算本表的引用 / 汇总字段（计算列的值可能过期时用）。 */
+  (e: "recalc", payload: { fieldId: string }): void;
   (e: "clear-sort", payload: { fieldId: string }): void;
   (e: "filter", payload: { fieldId: string }): void;
   (e: "freeze", payload: { fieldId: string }): void;
@@ -62,6 +65,17 @@ function run(action: () => void) {
 
 function typeLabel() {
   return fieldPlugin(props.field.type)?.label ?? "字段";
+}
+
+/**
+ * 是否是「计算字段」（引用 / 汇总）。
+ *
+ * 这类列的值不是用户直接填的，而是服务端按关联关系算出来的**快照**：
+ * 改了关联表之后会自动重算，但重算可能失败或还没跑完 ——
+ * 所以菜单里要给出「立即重算」的入口，别让用户把旧值当成实时值。
+ */
+function isComputedType(type: string) {
+  return isSnapshotField(type);
 }
 
 function applyWidth() {
@@ -174,6 +188,17 @@ function applyWidth() {
         >
           <el-icon><Setting /></el-icon>
           <span class="be-colmenu__label">编辑字段</span>
+        </button>
+        <!-- 计算字段（引用 / 汇总）的值是「最近一次重算的结果」，
+             给一个就地重算的入口，别让用户对着旧值发愁。 -->
+        <button
+          v-if="isComputedType(field.type)"
+          class="be-colmenu__item"
+          type="button"
+          @click="run(() => emit('recalc', { fieldId: field.id }))"
+        >
+          <el-icon><Refresh /></el-icon>
+          <span class="be-colmenu__label">重算引用 / 汇总</span>
         </button>
       </div>
 

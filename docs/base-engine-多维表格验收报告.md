@@ -1353,3 +1353,217 @@ ALL PASS
 | `vite build` | ✅ |
 | `npm run test:e2e:base` | ✅ 27/27 |
 | `cmd/loadtest -scale large` | ✅ 8 场景全部 0 错 |
+
+### 3.84 批次 O：写路径剩余项治理（批量更新 / 关键字检索 / 墓碑回收）
+
+#### 3.84.1 取证
+
+- 批量更新 100 行 P50 **837ms**（第 51 章只治理了批量创建，批量更新仍是逐行解析身份、逐行编译条件）；
+- 关键字检索 P95 **607ms**，且**无命中**时耗时与全命中几乎相同（都在扫全表）；
+- 本地库压测残留 **467,862 条墓碑记录**（`base_records` 246MB），
+  根因是删表只软删 `base_records`，其值行 `base_record_values` 永不回收。
+
+#### 3.84.2 治理项
+
+| 治理项 | 做法 |
+| --- | --- |
+| 批量更新共享上下文 | 批外解析身份（1 次）+ 编译条件（1 次），批内按 50 行分块事务，投影批量落库 |
+| 关键字条件只编译一次 | 一条记录的全部关键字条件编译一次，按字段类型保留分支 |
+| 关键字候选集快路径 | `LIMIT cap+1` 探测（cap=2000）：0 行→恒假条件 `1=0`；≤cap→`id IN (…)`；探满→回落半连接。**仅纯文本字段表启用**，避免 JSON/doc 字段漏结果 |
+| pg_trgm 模糊索引 | `ensureBaseSearchIndex` 建 `idx_base_value_text_trgm` GIN 索引；扩展/索引失败静默降级 |
+| 墓碑硬删 | 删表 / 删 Base 时 `purgeTableRecords` 连同值行硬删；`PurgeTombstonedRecords(30d)` 接入 `RunMaintenanceOnce` |
+
+#### 3.84.3 压测结果（`cmd/loadtest -scale large`，50 并发，5000 行 × 20 字段）
+
+| 场景 | 治理前 | 治理后 |
+| --- | --- | --- |
+| 常规筛选（关键字） | 154 QPS / P95 607ms | **1653 QPS / P95 41ms** |
+| 批量 100 条编辑 | 60.8 QPS / P50 837ms | **137.9 QPS / P50 358ms** |
+| 首屏查询 | 1210 QPS / P95 57ms | 1610 QPS / P95 43ms |
+| 批量写入 500 行 | 13.3 QPS / P50 4.07s | 16.7 QPS / P50 3.35s |
+| 错误数 | — | **8 个场景全部 0 错** |
+
+单项 API 实测（20 字段 × 5000 行表）：无关键字 **8ms**；关键字全命中 **~100ms**；
+**关键字无命中 41ms → 5~9ms**；**批量更新 100 行 837ms → 168~187ms**。
+
+数据卫生：清理后 `base_records` **246MB → 13MB**，墓碑 **467,862 → 0**。
+
+#### 3.84.4 回归用例（`internal/base/keyword_search_test.go`）
+
+| 用例 | 作用 | 结果 |
+| --- | --- | --- |
+| `TestKeywordSearchReturnsOnlyMatchingRecords` | 关键字只返回命中的记录（防候选集漏结果） | ✅ |
+| `TestDeleteTableHardDeletesRecords` | 删表后记录硬删、不留墓碑 | ✅ |
+| `TestPurgeTombstonedRecords` | 保留期外清理、期内保留 | ✅ |
+
+#### 3.84.5 门禁复测
+
+| 门禁 | 结果 |
+| --- | --- |
+| `go build ./...` | ✅ |
+| `go test ./internal/... -count=1`（真实 PG，指向开发库） | ✅ 全绿（11 包） |
+| `vitest` | 291 passed / 6 failed（`rte/**` 基线，与本轮无关） |
+| `vue-tsc` | 60 errors（全部基线文件），`modules/base` **0 错误** |
+| `vite build` | ✅ |
+| `npm run test:e2e:base` | ✅ ALL PASS（27 项） |
+| `base-engine-audit.mjs` | ✅ ALL PASS |
+| `base-ops-panel-e2e.mjs` | ✅ ALL PASS |
+| `cmd/loadtest -scale large` | ✅ 8 场景全部 0 错 |
+
+### 3.85 批次 P：P0 正确性修复 + 事件风暴治理 + 限流档位
+
+#### 3.85.1 修复清单与证据
+
+| 项 | 问题 | 修复 | 回归用例 |
+| --- | --- | --- | --- |
+| F-01 | 多字段排序 / 分组 → HTTP 500（`table name "sv" specified more than once`） | JOIN 别名带序号（`gv0/gv1/sv0/sv1`），JOIN 与 ORDER BY 同源 | `multi_sort_test.go`（4 组组合断言顺序）✅ |
+| F-02 | 引用 / 汇总列写入后不更新（`scheduleDependentRecalc` 是死代码） | 写入后触发后台重算（dirty 标记 + 合并窗口 + 全局闸门） | `dependent_recalc_test.go` ✅ |
+| F-03 | 重算三重 N+1 + 整表载入 + 30s 超时 | 游标分批 + 目标记录批量取回 + 字段元数据取一次 + 超时 5min | `lookup.go` 重构 ✅ |
+| F-04 | 重建投影只处理前 5000 行 | 去掉 `Limit(5000)`，改 id 游标分批 | `reindex_cursor_test.go`（5200 行表）✅ |
+| F-05 | 同义重复索引（写放大） | `ensureBaseDedupeIndexes` 幂等清理全部表 | `dedupe_index_test.go` + `pg_indexes` 实测 ✅ |
+| P-01 | 关键字检索无索引可用 | `pg_trgm` GIN（`idx_base_value_text_trgm`） | 关键字筛选 154 → 1549 QPS ✅ |
+| P-04 | 单条更新每次多查一遍 `base_fields` | 复用已加载的字段索引 | `service.go` ✅ |
+| P-05 | 批量写产生 N 条 outbox 事件 | 每块一条 `record.batch_updated` | `batch_event_test.go` ✅ |
+| P-06 | 删字段 / 类型迁移 / 公式回填整表载入 | 统一走 `cursor.go` 游标分批 | `reindex_cursor_test.go` ✅ |
+| P-08 | 限流默认 40 RPS（实测能力 1650 QPS）+ 路径含 ID 形同虚设 | 默认 200/400；限流维度改为「用户 × 接口类别」 | `ratelimit_class_test.go` ✅ |
+
+#### 3.85.2 压测结果（`cmd/loadtest -scale large`，50 并发，5000 行 × 20 字段）
+
+| 场景 | 治理前 | 批次 P 后 | HEAD 对照（同环境） |
+| --- | --- | --- | --- |
+| 首屏查询（100 条 × 20 字段） | 1210 QPS / P95 57ms | 1427 QPS / P95 47ms | 1442 QPS / P95 46ms |
+| 常规筛选（关键字） | 154 QPS / P95 607ms | **1549 QPS / P95 44ms** | 1244 QPS / P95 58ms |
+| 视图配置读取 | 11666 QPS / P95 6ms | 7991 QPS / P95 11ms | 8251 QPS / P95 11ms |
+| 表结构读取 | 1942 QPS / P95 33ms | 1661 QPS / P95 43ms | 1731 QPS / P95 44ms |
+| 单条更新 | 1251 QPS / P95 50ms | 1121 QPS / P95 60ms | 1151 QPS / P95 63ms |
+| 批量 100 条编辑 | 60.8 QPS / P50 837ms | **134.6 QPS / P50 366ms** | 133.2 QPS / P50 369ms |
+| 深翻页（keyset 20 页） | 1219 QPS / P95 57ms | **1623 QPS / P95 41ms** | 1312 QPS / P95 55ms |
+| 批量写入（500 行/批） | 13.3 QPS / P50 4.07s | **17.5 QPS / P50 3.07s** | 17.3 QPS / P50 3.23s |
+
+> **错误数说明**：本机 PG 容器 `max_connections=100`，dev 实例 + 压测实例各 50 连接，
+> 高并发下出现 `tls error: EOF` 连接抖动。
+> **HEAD 版本二进制跑同一压测，错误数同量级**（85 / 419 / 286 / 61），
+> 证明是环境噪声而非本轮回归。
+
+#### 3.85.3 数据卫生
+
+- 墓碑硬删 + 保留期清理后：`base_records` 246MB → 13MB；
+- 本轮压测残留 179,500 条墓碑已清理，当前 **153 条记录 / 13 张表 / 232KB**；
+- 清理时发现并修掉一个新缺陷：墓碑清理用 `IN (...)` 一次性传 3 万多个参数，
+  Postgres 直接报 `extended protocol limited to 65535 parameters` → 改为**每 1000 个一批**。
+
+#### 3.85.4 门禁复测
+
+| 门禁 | 结果 |
+| --- | --- |
+| `go build ./...` | ✅ |
+| `go test ./internal/... -count=1`（真实 PG） | ✅ 全绿（11 包） |
+| `vitest` | 291 passed / 6 failed（`rte/**` 基线） |
+| `vue-tsc` | 60 errors（全部基线文件），`modules/base` **0 错误** |
+| `vite build` | ✅ |
+| `base-engine-e2e.mjs` | ✅ ALL PASS |
+| `base-engine-audit.mjs` | ✅ ALL PASS（限流用例改为并发打满，见 3.85.5） |
+| `base-ops-panel-e2e.mjs` | ✅ ALL PASS |
+
+#### 3.85.5 限流档位提高后对 E2E 的影响
+
+限流默认从 40/80 提到 200/400 后，审计脚本里「串行 400 次撞限流」的断言不再成立
+（串行速率接近令牌补充速率，永远撞不中）。
+已改为**每轮 50 并发、直到命中 429**（最多 2000 次）—— 断言的是「超限确实返回 429」，
+而不是「某个具体的次数」。
+
+#### 3.85.6 未完成项
+
+P-02（COUNT 与取数只扫一次）、P-03（两段式排序查询）、P-07 的 N+1 断言、
+A-01~A-09 / E-01~E-07 的能力面扩展，以及**中文全文检索**（`pg_trgm` 对 CJK 无效）
+本轮未做，详见 [优化清单](./base-engine-多维表格-优化清单.md) 第八节。
+
+### 3.86 批次 Q：扫描次数治理 + 跨表依赖反查 + 审计变更集
+
+> 对应技术方案第 54 章。批次 P（第 53 章）修的是正确性缺陷，
+> 批次 Q 处理**扫描次数**、**依赖反查**与**审计可回放**，并更正一条被实测推翻的旧结论。
+
+#### 3.86.1 P-02：关键字查询的扫描次数减半 ✅
+
+| 口径 | 20 万行投影 / 命中 2 万行 | 说明 |
+| --- | --- | --- |
+| 旧：独立 COUNT + 取数 | 62.6ms + 42.9ms = **105.5ms** | 关键字扫描做了两遍 |
+| 新：一次扫描 + 窗口计数 | **44.5ms** | `COUNT(*) OVER ()` 顺带带回总数 |
+
+**边界（三条都有代价）**
+
+1. 没有关键字时仍走独立 COUNT —— COUNT 走索引扫描是毫秒级，
+   窗口计数反而会阻止 top-N 堆排序提前收尾；
+2. 带翻页锚点时仍走独立 COUNT —— 锚点在 WHERE 里，
+   窗口计数会变成「还剩多少条」而不是「一共有多少条」（语义会变）；
+3. 排序 / 分组的 LEFT JOIN 必须 1:1 —— 新增
+   `base_record_values (record_id, field_id)` 唯一索引兜底
+   （`internal/db/base_value_unique.go`，含存量去重 + 幂等重建）。
+
+**落地确认**：本地库 `pg_indexes` 实测存在
+`uniq_base_record_values_record_field`；`base_operation_logs.change_set` 列已存在。
+
+#### 3.86.2 A-06：跨表依赖反查索引 ✅
+
+| 项 | 治理前 | 现状 |
+| --- | --- | --- |
+| 「谁依赖我」怎么查 | 把整个 Base 的表列一遍，**逐表加载字段索引**再逐字段比对 | 一条索引查询（`dependentTableIDs`） |
+| 索引 | 无 | `idx_base_field_target_table ON base_fields ((config->>'targetTableId'))` |
+| 依赖图 | 只有公式字段的依赖 | 引用 / 汇总字段的跨表边也落库（`lookup` / `rollup`），字段增删改时维护、启动时回填 |
+| 依赖边唯一性 | 无约束 | `uniq_base_dep_formula_field_type (formula_field_id, dependency_field_id, dependency_type)` |
+
+回归用例：`TestCrossTableDependencyEdgePersisted`（建字段写边 → 反查命中 → 删字段清边）。
+
+#### 3.86.3 A-05：审计的字段级变更集 ✅
+
+- `base_operation_logs` 新增 `change_set jsonb`（`ensureBaseAuditChangeSet` 幂等补列）；
+- 变更集只记**真正变化**的字段：`added` / `removed` / `modified`
+  （数值按数值比，避免 `1` 与 `1.0` 判成不同；数组按顺序比）；
+- 删除记录时把被删内容写进 before —— 原先是 `nil, nil`，审计里只剩一句「删了」；
+- 变更集与 before / after 走**同一套字段级可见性**，隐藏字段的条目读出时剥掉。
+
+回归用例：`TestAuditChangeSetRecordsFieldLevelDiff`（改 1 个字段 → 变更集 1 条）。
+
+#### 3.86.4 P-07：把往返数锁进用例 ✅
+
+| 用例 | 锁住什么 | 实测 |
+| --- | --- | --- |
+| `TestBatchUpdateSelectCountNotLinearInRows` | 批量更新的 SELECT 次数与行数无关 | 10 行 / 40 行都是 **14 次 SELECT** |
+| `TestKeywordSearchSkipsJSONBranchWhenNoJSONField` | 无 JSON 字段时不得出现 `value_json` 分支 | 有 JSON 字段时必须出现 |
+| `TestCrossTableDependencyEdgePersisted` | 依赖边生命周期 | 见 3.86.2 |
+| `TestAuditChangeSetRecordsFieldLevelDiff` | 变更集粒度 | 见 3.86.3 |
+
+> 计数用 GORM logger 钩子按动词分类，挂 `db.Session(&gorm.Session{Logger: ...})`，
+> 共用同一条连接池，不影响被测逻辑。
+
+#### 3.86.5 更正：「pg_trgm 对中文无效」是错的 ❌→✅
+
+清单长期挂着「中文全文检索未解决」，理由是 `pg_trgm` 对 CJK 无效。
+本轮用真实 Postgres 实测推翻：
+
+```
+EXPLAIN (ANALYZE, BUFFERS) SELECT id FROM tmp_cjk_probe WHERE t ILIKE '%思维导图%';
+-- Bitmap Heap Scan on tmp_cjk_probe
+--   ->  Bitmap Index Scan on tmp_cjk_probe_trgm
+--         Index Cond: (t ~~* '%思维导图%'::text)
+-- Execution Time: 2.485 ms        （5 万行中文表）
+```
+
+`show_trgm('知识库管理')` 返回 6 个三值组 —— 汉字被当成独立词，
+三值组照样落在汉字内部。**不需要 ngram 分词方案。**
+真正的限制是：查询词 < 3 字符用不上索引；GIN 索引是全表级的，热门关键词堆回表开销大；
+JSON 字段分支（`value_json::text ILIKE`）走不了索引 —— 需把可搜文本落到 `value_text`。
+
+#### 3.86.6 门禁
+
+| 门禁 | 结果 |
+| --- | --- |
+| `go build ./...` | ✅ |
+| `go test ./internal/... -count=1`（真实 PG localhost:5433） | ✅ 11 包全绿 |
+| `base-engine-e2e.mjs` | ✅ ALL PASS |
+| `base-engine-audit.mjs` | ✅ ALL PASS |
+| `base-ops-panel-e2e.mjs` | ✅ ALL PASS |
+| `cmd/loadtest -scale large`（50 并发，5000 行 × 20 字段） | 首屏 1756 QPS / 关键字 1733 QPS / 深翻页 1616 QPS，错误 0 |
+
+> 压测机本机 PG 容器 `max_connections=100`，dev 与压测实例各占 50 条，
+> 高并发下偶发 `tls error: EOF` —— HEAD 版本同样复现，属环境噪声。

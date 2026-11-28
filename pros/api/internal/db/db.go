@@ -184,6 +184,30 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureBaseEngineIndexes(gdb); err != nil {
 		log.Printf("ensureBaseEngineIndexes warning: %v", err)
 	}
+	// 关键字检索索引：装不上 pg_trgm 时静默跳过（只影响速度）。
+	if err := ensureBaseSearchIndex(gdb); err != nil {
+		log.Printf("ensureBaseSearchIndex warning: %v", err)
+	}
+	// 清理重复索引（表改名残留）：幂等，失败只记日志不阻断启动。
+	if err := ensureBaseDedupeIndexes(gdb); err != nil {
+		log.Printf("ensureBaseDedupeIndexes warning: %v", err)
+	}
+	// 投影表 (record_id, field_id) 唯一：排序 JOIN 与窗口计数都依赖 1:1。
+	if err := ensureBaseValueUniqueIndex(gdb); err != nil {
+		log.Printf("ensureBaseValueUniqueIndex warning: %v", err)
+	}
+	// 跨表依赖的反查索引：谁依赖这张表。
+	if err := ensureBaseDependencyIndex(gdb); err != nil {
+		log.Printf("ensureBaseDependencyIndex warning: %v", err)
+	}
+	// 审计的字段级变更集列。
+	if err := ensureBaseAuditChangeSet(gdb); err != nil {
+		log.Printf("ensureBaseAuditChangeSet warning: %v", err)
+	}
+	// JSON 型投影补可搜文本：让附件 / 成员 / 关联记录也能走索引检索。
+	if err := ensureBaseSearchableText(gdb); err != nil {
+		log.Printf("ensureBaseSearchableText warning: %v", err)
+	}
 	if err := ensureBaseRecordSortOrder(gdb); err != nil {
 		log.Printf("ensureBaseRecordSortOrder warning: %v", err)
 	}
@@ -400,6 +424,22 @@ func ensureBaseRecordVisibility(gdb *gorm.DB) error {
 	return nil
 }
 
+// ensureBaseAuditChangeSet 给操作审计补「字段级变更集」列（A-05）。
+//
+// 审计行原本只有 before / after 两份完整快照：能看出「现在是什么样」，
+// 看不出「到底改了哪几个字段」。新增 change_set 列只记真正变化的字段，
+// 审计才能当变更历史回放。
+//
+// 列可空：存量审计行没有变更集，补 NULL 即可，不用回填。
+func ensureBaseAuditChangeSet(gdb *gorm.DB) error {
+	if !gdb.Migrator().HasTable("base_operation_logs") {
+		return nil
+	}
+	return gdb.Exec(
+		`ALTER TABLE base_operation_logs ADD COLUMN IF NOT EXISTS change_set jsonb`,
+	).Error
+}
+
 // ensureBaseEngineIndexes 给 Base Engine 补查询投影与事件表的索引。
 //
 // 记录主数据在 JSONB，筛选与排序走类型化投影表（base_record_values），
@@ -420,6 +460,37 @@ func ensureBaseEngineIndexes(gdb *gorm.DB) error {
 		if err := gdb.Exec(stmt).Error; err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// ensureBaseSearchIndex 建关键字检索用的三值组（pg_trgm）索引。
+//
+// 为什么需要：关键字搜索是「value_text ILIKE '%kw%'」这种**子串**匹配，
+// B-tree 索引用不上（只有前缀才能走索引）。没有三值组索引时，
+// 每次搜索都要扫一遍本表全部投影行 —— 实测 5 万行的表里
+// 「搜不到任何结果」也要 41ms，而搜索本身毫无产出。
+//
+// 装不上 pg_trgm（精简镜像 / 没有超级用户权限）时**静默跳过**：
+// 检索会退回顺序扫描，功能不受影响，只是慢一点 —— 不能因为一个索引
+// 让整个服务起不来。
+func ensureBaseSearchIndex(gdb *gorm.DB) error {
+	if !gdb.Migrator().HasTable(&model.BaseRecordValue{}) {
+		return nil
+	}
+	if err := gdb.Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm").Error; err != nil {
+		return nil
+	}
+	var installed bool
+	if err := gdb.Raw("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm')").Scan(&installed).Error; err != nil || !installed {
+		return nil
+	}
+	// CONCURRENTLY：线上库投影表可能很大，不能拿建索引锁住写入。
+	// gorm 的 Exec 走自动提交，不在事务里，满足 CONCURRENTLY 的要求。
+	if err := gdb.Exec(
+		"CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_base_value_text_trgm ON base_record_values USING gin (value_text gin_trgm_ops)",
+	).Error; err != nil {
+		return err
 	}
 	return nil
 }

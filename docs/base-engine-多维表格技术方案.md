@@ -2983,3 +2983,365 @@ type writeIO struct { table, idx, projFields, subj, formulas, pendingAudits, pen
 
 > 反向验证：把「事务内查一次权限」这一行临时加回去，
 > 上述用例立刻从 0.24s 变成 200s 超时 —— 用例确实咬住了这个缺陷。
+
+## 52. 批次 O：写路径剩余项治理（批量更新 / 关键字检索 / 墓碑回收）
+
+> 批次 N（第 51 章）把「批量创建」的往返数与行数脱钩，但批量**更新**与关键字**检索**
+> 仍是逐行编译条件 / 逐行查上下文的实现。本章收掉这两项，并处理批次 N 遗留的数据卫生问题。
+
+### 52.1 批量更新：共享上下文 + 分块事务
+
+**旧实现的问题**（`BatchUpdate`，100 行/批，P50 837ms）：
+
+1. 每一行都重新解析一次权限身份（查角色 / 成员关系），100 行 = 几百次重复往返；
+2. 每一行都重新编译一遍更新条件并单独发一条 `UPDATE`，100 行 = 100 次网络往返；
+3. 字段投影 `base_record_values` 的写入是逐行 DELETE + 逐行 INSERT。
+
+**治理后的结构**（`internal/base/batch_update.go`）：
+
+```
+批外：解析权限身份（1 次）→ 装载字段元数据 → 编译更新条件（1 次）
+批内：按 50 行分块开事务
+      ├─ 每块先建 SAVEPOINT
+      ├─ 逐行 UPDATE（复用已编译的条件与已解析的身份）
+      ├─ 投影批量落库（1 次批量 DELETE + 1 次批量 INSERT）
+      └─ 失败行回滚到 SAVEPOINT，其余行继续
+```
+
+关键点：**条件只编译一次**（`UPDATE … WHERE id IN ?` + 统一的 `SET` 片段），
+**身份只解析一次**（写 IO 上下文在整批内共享），**投影批量落库**。
+
+### 52.2 关键字检索：条件只编译一次 + 候选集快路径
+
+**旧实现**（`internal/base/query_keyword.go`）：每条记录、每个字段都单独拼一次
+`ILIKE '%kw%'` 条件并送进数据库，字段越多越慢，且每次查询都要重新编译。
+
+**治理后的两级结构**：
+
+| 层级 | 做法 | 效果 |
+| --- | --- | --- |
+| 条件编译 | 一条记录的**全部关键字条件只编译一次**，按字段类型保留分支（文本走 `ILIKE`，数字/日期走等值/范围） | 去掉 per-record 的重复构造 |
+| 候选集快路径 | 先探 `LIMIT cap+1`（`keywordCandidateCap = 2000`）：<br>· 0 行 → 直接返回恒假条件 `1 = 0`，不再回表<br>· ≤ cap → 用 `r.id IN (…)` 主键集合过滤<br>· 探满 → 回落到原有的半连接写法 | 无命中时从 41ms 降到 **5~9ms** |
+
+> **安全前提**：候选集快路径**只在「纯文本字段、无 JSON 字段、无 doc 字段」时启用**。
+> 因为关键词可能命中 JSON / 富文本字段，这类表用 `IN (主键集合)` 会漏结果 ——
+> 宁可慢，也不能少返回。
+
+**配套索引**（`internal/db/db.go::ensureBaseSearchIndex`）：
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_trgm;   -- 失败即静默跳过，不阻断启动
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_base_value_text_trgm
+  ON base_record_values USING GIN (value_text gin_trgm_ops);
+```
+
+> `CREATE INDEX CONCURRENTLY` 不能在事务里执行，因此单独一次连接完成。
+> 扩展 / 索引创建失败只记日志 —— 检索功能降级为「无索引扫描」，不影响可用性。
+
+### 52.3 墓碑回收：删表 / 删 Base 时硬删记录
+
+**问题**：批次 N 的压测在本地库堆出了 **467,862 条墓碑记录（246MB）** ——
+删表只软删了 `base_records`，但记录的**值行**永远不会被回收。
+`base_record_values` 按 `record_id` 挂在记录上，记录留着，值就永远留着。
+
+**治理**（`internal/base/service.go`）：
+
+- 删除表 / 删除 Base 时，除了软删表本身，额外调用 `purgeTableRecords`，
+  把该表下所有记录**连同其值行硬删**（不留墓碑）；
+- 表**没有**被删、只是记录被软删的场景保持原有语义（墓碑仍留，给审计/撤销用）；
+- 新增 `internal/base/maintenance.go::PurgeTombstonedRecords(keepDays)`：
+  按保留期清理「记录与表都已被删」的残留墓碑，`TombstoneKeepDays` 默认 **30 天**；
+  已接入 `RunMaintenanceOnce`，走日常维护任务。
+
+**实测**：清理后 `base_records` 从 **246MB → 13MB**，墓碑数 `467,862 → 0`。
+
+### 52.4 治理结果（`cmd/loadtest -scale large`，50 并发，5000 行 × 20 字段）
+
+| 场景 | 治理前 | 治理后 |
+| --- | --- | --- |
+| 常规筛选（关键字） | 154 QPS / P95 607ms | **1653 QPS / P95 41ms** |
+| 批量 100 条编辑 | 60.8 QPS / P50 837ms | **137.9 QPS / P50 358ms** |
+| 首屏查询 | 1210 QPS / P95 57ms | 1610 QPS / P95 43ms |
+| 批量写入 500 行 | 13.3 QPS / P50 4.07s | 16.7 QPS / P50 3.35s |
+| 错误数 | — | **8 个场景全部 0 错** |
+
+单项 API 实测（20 字段 × 5000 行）：
+
+| 场景 | 治理前 | 治理后 |
+| --- | --- | --- |
+| 无关键字查询 | 8ms | 8ms |
+| 关键字全命中 | ~100ms | ~100ms |
+| **关键字无命中** | **41ms** | **5~9ms** |
+| **批量更新 100 行** | **837ms** | **168~187ms** |
+
+### 52.5 回归用例
+
+`internal/base/keyword_search_test.go`：
+
+| 用例 | 作用 |
+| --- | --- |
+| `TestKeywordSearchReturnsOnlyMatchingRecords` | 关键字检索**只返回命中的记录**，不多不少（防止候选集快路径漏结果） |
+| `TestDeleteTableHardDeletesRecords` | 删表后记录被**硬删**，不留墓碑 |
+| `TestPurgeTombstonedRecords` | 保留期外的墓碑被清理，保留期内的保留 |
+
+## 53. 批次 P：P0 正确性修复 + 事件风暴治理 + 限流档位
+
+> 批次 O（第 52 章）收掉了写路径的吞吐问题；
+> 批次 P 处理的是**正确性缺陷**与**运维面**问题 —— 清单见
+> [多维表格优化清单](./base-engine-多维表格-优化清单.md)。
+
+### 53.1 F-01：多字段排序 / 分组不再 500
+
+**故障**：用户在筛选面板加第 2 条排序或分组，整页报 500。
+
+```
+POST /base/tables/:tableId/query {"sorts":[A,B]}
+→ 500 {"code":"50001","detail":"ERROR: table name \"sv\" specified more than once (SQLSTATE 42712)"}
+```
+
+**根因**：投影 JOIN 的别名写死为 `gv` / `sv`。第一个字段 JOIN 一次，
+第二个字段再 JOIN 一次同名别名 → Postgres 直接拒绝。前端明确支持多条
+（`MAX_SORTS=5` / `MAX_GROUPS=3`），所以这是高频故障。
+
+**修复**（`internal/base/query.go`）：
+
+- 新增 `planOrderJoins`：**别名带序号**（`gv0 / gv1 / sv0 / sv1`）；
+- JOIN 与 ORDER BY **同源生成**（同一份 plan 结果）——
+  否则 ORDER BY 里的别名对不上，排序会**静默失效**；
+- keyset 翻页的 `sortKeyPlan` 也改成用同一套别名（原先硬编码 `sv.value_text`）。
+
+**语义约定**：**分组在前、排序在后**（GROUP BY 定组间次序，SORT 定组内次序）。
+
+回归用例 `internal/base/multi_sort_test.go` 覆盖 4 组组合，并断言**确切顺序**
+（别名改了但 ORDER BY 没跟着改 → 顺序错 → 用例红）。
+
+### 53.2 F-02 / F-03：引用 / 汇总字段写入后自动重算
+
+**故障**：`scheduleDependentRecalc` 是**死代码**（全仓无调用点）。
+改了关联记录之后，引用 / 汇总列一直是旧值，只有手点「重算」才更新。
+重算路径本身还是三重 N+1：每行 `SELECT base_records` + `UPDATE` +
+`SELECT base_fields` + `DELETE values` + `INSERT values` ≈ 5 次 SQL / 行，
+而且整表 JSONB 一次性载入内存，还带 30s 超时（大表必然半途而废）。
+
+**修复**：
+
+| 维度 | 旧实现 | 现状 |
+| --- | --- | --- |
+| 触发 | 死代码 | 记录新增 / 更新 / 删除后触发（后台异步） |
+| 调度 | —— | dirty 标记 + 合并窗口（300ms）+ 全局并发闸门（容量 1） |
+| 依赖判定 | —— | 「有没有表引用我」缓存 60s；结构变更主动失效 |
+| 判定时机 | —— | **后台 goroutine**（写入路径里同步查库会卡死小连接池） |
+| 重算扫描 | 整表载入内存 | id 游标分批（500 行 / 批） |
+| 目标记录 | 每行查一次 | 每批一次性批量取回，内存里算 |
+| 字段元数据 | 每行查一次 | 取一次 |
+| 超时 | 30s | 5 分钟（重算幂等，可续） |
+
+> **调度模型为什么是「合并」而不是「去抖丢弃」**：
+> 早先实现用「2 秒内直接 return」去抖，结果把窗口内的写入**吞掉** ——
+> 重算根本没发生，引用列还是旧值（回归用例 `TestDependentRecalcRunsAfterWrite` 抓到）。
+> 现在用 dirty 标记：窗口内的写入会安排**下一轮**，不会丢。
+
+### 53.3 F-04 / P-06：整表载入与 5000 行硬上限
+
+旧实现三处 `Limit(5000)` / `Find(&records)`：
+
+- `reindexTable` / `reindexTableTx`：类型迁移在事务里转了**全部**记录，
+  却只重建**前 5000 行**的投影 → 第 5001 行以后投影停留在旧类型，数据与投影不一致；
+- `recalcTableFormulas` / `MigrateField` / 删字段清残留：**整表 JSONB 载入内存**；
+- 重排：`Limit(5000)` 让第 5001 条以后的记录被排除，保留旧 `sort_order` → 顺序错乱。
+
+**修复**：新增 `internal/base/cursor.go`：
+
+- `iterateRecordsByCursor`：按 **id 游标**分批（500 行 / 批）；
+  用主键做游标比 OFFSET 稳 —— 遍历期间的写入 / 删除不会导致重复或漏行；
+- `iterateRecordIDsBySortOrder`：按 `(sort_order, id)` 游标，只取 ID 不读 JSONB；
+- 上述四条路径全部改走游标分批，**5000 行硬上限全部去掉**。
+
+回归用例 `internal/base/reindex_cursor_test.go`：5200 行表重建投影后，
+投影条数必须等于记录条数（旧实现会卡在 5000）。
+
+### 53.4 F-05：重复索引清理
+
+历史多次表改名（`base_record` → `base_records` 等）导致同义索引成对存在：
+
+```
+base_records        idx_base_record_created_by   ≡ idx_base_records_created_by
+base_records        idx_base_record_deleted_at   ≡ idx_base_records_deleted_at
+base_records        idx_base_record_updated_by   ≡ idx_base_records_updated_by
+base_records        idx_base_records_tenant       ≡ idx_base_records_tenant_id
+base_record_values  idx_base_record_values_tenant ≡ idx_base_record_values_tenant_id
+base_tables         idx_base_table_deleted_at     ≡ idx_base_tables_deleted_at
+base_tables         idx_base_tables_tenant        ≡ idx_base_tables_tenant_id
+base_fields         idx_base_fields_tenant        ≡ idx_base_fields_tenant_id
+base_apps           idx_base_app_deleted_at        ≡ idx_base_apps_deleted_at
+kb_documents        idx_canvas_documents_deleted_at ≡ idx_kb_documents_deleted_at
+kb_nodes            idx_knowledge_nodes_created_by  ≡ idx_kb_nodes_created_by
+```
+
+**修复**：`internal/db/dedupe_index.go::ensureBaseDedupeIndexes`
+在启动时幂等清理（保留符合 `idx_<域>_<实体>_<列>` 规范的那个）。
+分组时必须先**把索引名从 indexdef 里抹掉**再比对 ——
+`indexdef` 里带着索引名，直接拿它当分组键的话两个同义索引永远分不到一组。
+
+### 53.5 P-05：outbox 事件风暴
+
+批量写 100 行会往发件箱塞 100 条 `record.updated`（实测发件箱里累计 27 万条）。
+现在改成**每块（≤50 行）一条 `record.batch_updated`**，
+审计仍逐条保留（审计要能回放，事件只需表达「这是一次批量操作」）。
+
+### 53.6 P-08：限流档位与限流维度
+
+| 项 | 旧 | 新 |
+| --- | --- | --- |
+| 默认 RPS / Burst | 40 / 80 | **200 / 400**（实测查询 1650 QPS、批量编辑 138 QPS，默认低一个数量级） |
+| 限流维度 | 用户 × **完整路径**（路径含表 ID / 记录 ID） | 用户 × **接口类别**（`PathClass` 把 ID 段归一化成 `:id`） |
+
+> 旧维度实际上让限流**形同虚设**：换一条记录就是新令牌桶。
+> `internal/middleware/ratelimit_class_test.go` 锁死归一化行为。
+
+### 53.7 本轮实测（`cmd/loadtest -scale large`，50 并发，5000 行 × 20 字段）
+
+| 场景 | 治理前 | 批次 P 后 |
+| --- | --- | --- |
+| 首屏查询 | 1210 QPS / P95 57ms | 1427 QPS / P95 47ms |
+| 常规筛选（关键字） | 154 QPS / P95 607ms | **1549 QPS / P95 44ms** |
+| 深翻页（keyset 20 页） | 1219 QPS / P95 57ms | **1623 QPS / P95 41ms** |
+| 批量 100 条编辑 | 60.8 QPS / P50 837ms | **134.6 QPS / P50 366ms** |
+| 批量写入（500 行/批） | 13.3 QPS / P50 4.07s | **17.5 QPS / P50 3.07s** |
+
+> **环境噪声说明**：本机 PG 容器 `max_connections=100`，dev 实例与压测实例各占 50 条，
+> 高并发下会出现 `tls error: EOF` 的连接抖动。
+> 用 **HEAD 版本二进制**跑同一压测，错误数同量级（85 / 419 / 286 / 61），
+> 证明这是环境噪声，**不是本轮改动引入的回归**。
+
+---
+
+## 54. 批次 Q：扫描次数治理 + 跨表依赖反查 + 审计变更集
+
+> 批次 P（第 53 章）修的是**正确性缺陷**；
+> 批次 Q 处理的是**扫描次数**、**依赖反查**与**审计可回放**三件事，
+> 以及一条被实测推翻的旧结论（见 54.4）。
+
+### 54.1 P-02：关键字查询的扫描次数减半
+
+**问题**：查询分两条语句执行 —— 一条 `COUNT(*)`、一条取数，
+两条**扫的是同一份 WHERE**。关键字搜索时代价最重：
+投影表（`base_record_values`）是全库最大的一张表，
+「搜 10 条」要把它扫两遍。
+
+**方案对比**（三种都实测过）：
+
+| 方案 | 20 万行投影 / 命中 2 万 | 结论 |
+| --- | --- | --- |
+| 旧：独立 COUNT + 取数 | 62.6ms + 42.9ms = **105.5ms** | 基线 |
+| 窗口计数 `COUNT(*) OVER ()` | **44.5ms** | 采用 |
+| 窗口计数（全部查询都用） | 需全排序，抵消 top-N 优势 | 只在有关键字时用 |
+
+**落地**（`internal/base/query.go`）：
+
+```sql
+-- 有关键字时：一次扫描同时拿到数据与总数
+SELECT r.*, COUNT(*) OVER () AS total_count
+FROM base_records r
+WHERE <筛选> AND r.id IN (SELECT ... FROM base_record_values WHERE value_text ILIKE ?)
+ORDER BY r.sort_order, r.id
+LIMIT 51
+```
+
+**三条边界**（每条都有代价，不能想当然）：
+
+1. **没有关键字时不用窗口计数** —— COUNT 走记录主表的索引扫描（毫秒级），
+   而窗口计数会阻止 Postgres 用 top-N 堆排序提前收尾，没有关键字可省就不划算；
+2. **带翻页锚点时不用窗口计数** —— 锚点在 WHERE 里，
+   窗口计数会变成「还剩多少条」而不是「一共有多少条」，**语义会变**；
+3. **排序 / 分组的 LEFT JOIN 必须 1:1** —— 否则一条记录会被 JOIN 出多次、
+   总数虚高。这一条由 `ensureBaseValueUniqueIndex`
+   （`base_record_values (record_id, field_id)` 唯一索引）兜底。
+
+> 第 3 条是本轮新增的**数据约束**：投影表原来允许同一 (记录, 字段) 出现多行。
+> 去重 + 唯一索引放在 `internal/db/base_value_unique.go`，
+> 幂等执行，重复行按物理行号保留一条（投影是派生数据，删重复行不丢业务数据）。
+
+### 54.2 A-06：跨表依赖的反查索引
+
+**问题**：引用 / 汇总字段（lookup / rollup）指向别的表，
+但这条依赖**只存在字段配置 JSON 里**（`config->>'targetTableId'`），
+`base_formula_dependencies` 里只有公式字段的依赖。
+结果：每次「目标表写完要重算依赖方」都得把整个 Base 的表列一遍、
+**逐表加载字段索引**再逐字段比对 —— O(表数) 次查库。
+
+**修复**：
+
+- **表达式索引**：`idx_base_field_target_table ON base_fields ((config->>'targetTableId'))`
+  —— 反查「谁指向这张表」的唯一入口；
+- **依赖边落库**：`syncComputedDependency` 在字段增删改时维护
+  `base_formula_dependencies` 的跨表边（`dependency_type = 'lookup' / 'rollup'`），
+  启动时用 SQL 回填存量字段（`ensureBaseDependencyIndex`）；
+- **反查改索引驱动**：`dependentTableIDs` 一条 SQL 拿到依赖方表清单，
+  替换掉原来「逐表加载字段索引」的循环；
+- **依赖边唯一**：`(formula_field_id, dependency_field_id, dependency_type)` 唯一索引，
+  保证回填幂等、字段维护不产生重复边。
+
+回归用例 `internal/base/p07_regression_test.go::TestCrossTableDependencyEdgePersisted`
+覆盖「建字段写边 → 反查命中 → 删字段清边」。
+
+### 54.3 A-05：审计的字段级变更集
+
+**问题**：审计行存的是 before / after 两份**完整快照**。
+快照能看出「现在是什么样」，看不出「到底改了哪几个字段」——
+100 个字段的记录改了一个值，前后两份快照各自 100 个字段，审计没法据此回放。
+
+**修复**：
+
+- `base_operation_logs` 增加 `change_set jsonb` 列（`ensureBaseAuditChangeSet` 幂等补列）；
+- `diffAuditValues` 计算字段级差异：`added` / `removed` / `modified`，
+  数值按数值比（避免 `1` 与 `1.0` 被判成不同），数组按顺序比；
+- 删除记录时把**被删内容**写进 before（原先是 `nil, nil` —— 审计里只剩一句「删了」，
+  回放不出删掉的是什么）；
+- 变更集与 before / after 走**同一套字段级可见性**：读出时隐藏字段的条目被剥掉，
+  不随审计过网（`stripHiddenChangeSet`）。
+
+### 54.4 被实测推翻的旧结论：「pg_trgm 对中文无效」
+
+清单里长期挂着一条「中文全文检索仍未解决」，理由是
+「`pg_trgm` 对 CJK 无效」。**这一条是错的**，本轮用真实 Postgres 实测推翻：
+
+```sql
+-- 5 万行中文表，GIN 三值组索引
+CREATE INDEX tmp_cjk_probe_trgm ON tmp_cjk_probe USING gin (t gin_trgm_ops);
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT id FROM tmp_cjk_probe WHERE t ILIKE '%思维导图%';
+-- Bitmap Heap Scan on tmp_cjk_probe
+--   ->  Bitmap Index Scan on tmp_cjk_probe_trgm
+--         Index Cond: (t ~~* '%思维导图%'::text)     ← 索引真的被用上了
+-- Execution Time: 2.485 ms
+```
+
+`show_trgm('知识库管理')` 返回 6 个三值组 —— Postgres 把每个汉字当成独立词，
+三值组照样落在汉字内部，所以**中文子串检索能用索引**。
+
+真正的限制有两条（与语言无关）：
+
+1. **查询词少于 3 个字符用不上索引**（三值组的固有限制，中英文一样）；
+2. **索引是全表级的**：`value_text` 上的 GIN 索引覆盖所有 Base 的投影行，
+   热门关键词会命中大量行，位图堆回表才是主要开销。
+
+**结论**：不需要 ngram 分词方案；需要的是把 JSON 字段的**可搜文本**也落到
+`value_text`（这样最贵的 `value_json::text ILIKE` 分支可以整体消失），
+以及对热门关键词做结果集收敛。
+
+### 54.5 P-07：把往返数锁进用例
+
+新增 `internal/base/p07_regression_test.go`：
+
+| 用例 | 锁住什么 | 实测 |
+| --- | --- | --- |
+| `TestBatchUpdateSelectCountNotLinearInRows` | 批量更新的 SELECT 次数与行数**无关** | 10 行 / 40 行都是 **14 次 SELECT**（UPDATE 随行数增长是预期） |
+| `TestKeywordSearchSkipsJSONBranchWhenNoJSONField` | 没有 JSON 字段时，检索条件里**不得出现** `value_json` 分支 | 有 JSON 字段时必须出现 |
+| `TestCrossTableDependencyEdgePersisted` | 跨表依赖边的写入 / 反查 / 删除清理 | 见 54.2 |
+| `TestAuditChangeSetRecordsFieldLevelDiff` | 审计变更集只记真正变化的字段 | 改 1 个字段 → 变更集 1 条 |
+
+> 计数用 GORM 的 logger 钩子按动词分类统计（SELECT / INSERT / UPDATE / DELETE），
+> 挂在 `db.Session(&gorm.Session{Logger: ...})` 上 —— 共用同一条连接池，
+> 不影响被测逻辑。

@@ -274,6 +274,10 @@ type BaseOperationLog struct {
 	Operation  string         `gorm:"type:varchar(32);not null;default:''" json:"operation"`
 	BeforeData datatypes.JSON `gorm:"type:jsonb" json:"beforeData"`
 	AfterData  datatypes.JSON `gorm:"type:jsonb" json:"afterData"`
+	// ChangeSet 是**字段级变更集**：只记真正变化的字段（added / removed / modified），
+	// 让审计能当「变更历史」回放，而不只是两份完整快照。
+	// 与 BeforeData / AfterData 一样受字段级可见性约束：读出时隐藏字段会被剥掉。
+	ChangeSet datatypes.JSON `gorm:"type:jsonb" json:"changeSet"`
 	RequestID  string         `gorm:"type:varchar(64);not null;default:''" json:"requestId"`
 	CreatedAt  time.Time      `gorm:"type:timestamptz;not null" json:"createdAt"`
 }

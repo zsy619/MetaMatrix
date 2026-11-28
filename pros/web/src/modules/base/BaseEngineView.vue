@@ -92,6 +92,7 @@ import {
   updateView,
   listBaseEmbedders,
   listLinkTargets,
+  recalcLookupRollup,
   type BaseEmbedder,
 } from "./api";
 import type {
@@ -1224,6 +1225,32 @@ function onColumnSettings(payload: { fieldId: string }) {
   fieldManagerFocusId.value = payload.fieldId;
 }
 
+/**
+ * 列菜单「重算引用 / 汇总」。
+ *
+ * 计算列（引用 / 汇总）的值是**最近一次重算的快照**：
+ * 改动关联表后服务端会自动重算，但重算可能失败或还没跑完。
+ * 给一个就地重算的入口，用户不用去字段管理器里找。
+ */
+async function onColumnRecalc() {
+  const tableId = activeTable.value?.id;
+  if (!tableId) return;
+  const loading = ElMessage({
+    message: "正在重算引用 / 汇总字段…",
+    type: "info",
+    duration: 0,
+  });
+  try {
+    const res = await recalcLookupRollup(props.projectId, tableId);
+    loading.close();
+    ElMessage.success(`已重算 ${res.updated ?? 0} 条记录`);
+    await runQuery();
+  } catch (err) {
+    loading.close();
+    ElMessage.error((err as Error).message || "重算失败");
+  }
+}
+
 // —— 视图配置 ——
 
 const hiddenFieldIds = computed(() => {
@@ -1832,6 +1859,7 @@ onBeforeUnmount(() => {
           @column-width="onColumnWidth"
           @column-reorder="onColumnReorder"
           @column-settings="onColumnSettings"
+          @column-recalc="onColumnRecalc"
         />
         <BaseFormView
           v-else-if="viewType === 'form' && !legacy"

@@ -33,7 +33,7 @@ import {
   Unlock,
   Operation,
   Rank,
-  Setting,
+  Setting, MagicStick,
 } from "@element-plus/icons-vue";
 import BaseFieldCell from "../fields/BaseFieldCell.vue";
 import BaseColumnMenu from "./BaseColumnMenu.vue";
@@ -41,7 +41,7 @@ import { fieldTypeIcon } from "../fields/icons";
 import { fieldPlugin } from "../fields/registry";
 import { buildPasteCells, cellToText } from "../clipboard";
 import type { FieldMeta, RecordRow, SortRule } from "../types";
-import { isComputedField } from "../fields/registry";
+import { isComputedField, isSnapshotField } from "../fields/registry";
 
 const props = defineProps<{
   fields: FieldMeta[];
@@ -96,6 +96,8 @@ const emit = defineEmits<{
   (e: "column-hide", payload: { fieldId: string }): void;
   (e: "column-width", payload: { fieldId: string; width: number }): void;
   (e: "column-settings", payload: { fieldId: string }): void;
+  /** 列头菜单：重算引用 / 汇总（计算列的值可能是旧快照）。 */
+  (e: "column-recalc", payload: { fieldId: string }): void;
   /** 拖拽表头调整列顺序（写视图个人偏好）。 */
   (
     e: "column-reorder",
@@ -1036,6 +1038,15 @@ function ctxOpenRecord() {
             <CaretTop v-if="sortOrderOf(column.field) === 'asc'" />
             <CaretBottom v-else />
           </el-icon>
+          <!-- 计算列（引用 / 汇总）的值是「最近一次重算的结果」，
+               不是实时值 —— 给个标识 + 说明，别让用户把它当成实时数据。 -->
+          <el-icon
+            v-if="isSnapshotField(fieldFor(column.field).type)"
+            class="base-grid__head-computed"
+            title="计算字段：值为最近一次重算的结果。改动关联表后会自动重算，也可以从列菜单里手动重算。"
+          >
+            <MagicStick />
+          </el-icon>
           <el-icon
             v-if="fieldFor(column.field).readOnly"
             class="base-grid__head-lock"
@@ -1054,6 +1065,7 @@ function ctxOpenRecord() {
             @hide="emit('column-hide', $event)"
             @width="emit('column-width', $event)"
             @settings="emit('column-settings', $event)"
+            @recalc="emit('column-recalc', $event)"
           />
           <!-- 列宽拖拽把手（飞书：列头右侧竖线，拖完即存视图配置；双击自动适应） -->
           <span
@@ -1249,6 +1261,14 @@ function ctxOpenRecord() {
 .base-grid__head-lock {
   font-size: 12px;
   color: var(--tg-text-3, #94a3b8);
+}
+
+/* 计算列（引用 / 汇总）标识：淡紫，和「只读锁」区分开。 */
+.base-grid__head-computed {
+  font-size: 12px;
+  color: #7c5cff;
+  flex: none;
+  cursor: help;
 }
 
 .base-grid__head-title {

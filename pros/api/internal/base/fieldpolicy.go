@@ -585,6 +585,8 @@ func (s *Service) ListAuditEntries(ctx context.Context, userID, projectID, baseI
 				after := s.humanizeAuditValues(ctx, stripHiddenJSON(item.AfterData, idx, subj), idx)
 				entry.BeforeData = before
 				entry.AfterData = after
+				// 变更集同样要过可见性：隐藏字段的变更条目不能随审计过网（A-05）。
+				entry.ChangeSet = stripHiddenChangeSet(item.ChangeSet, idx, subj)
 			}
 			// 字段名映射：审计可能来自 base 内其它表。
 			entry.FieldNames = map[string]string{}

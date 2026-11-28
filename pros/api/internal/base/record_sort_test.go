@@ -28,7 +28,7 @@ func newRecordSortFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UU
 	}
 	if err := db.Exec(`CREATE TABLE IF NOT EXISTS base_operation_logs (
 		id uuid primary key, tenant_id uuid, project_id uuid, base_id uuid, table_id uuid, record_id uuid,
-		operator_id uuid, operation varchar(32), before_data json, after_data json,
+		operator_id uuid, operation varchar(32), before_data json, after_data json, change_set json,
 		request_id varchar(64), created_at datetime)`).Error; err != nil {
 		t.Fatalf("create base_operation_logs failed: %v", err)
 	}

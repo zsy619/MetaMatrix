@@ -29,6 +29,11 @@ type MaintenanceConfig struct {
 	OutboxMaxRetries int
 	// ImportJobKeepDays 是导入任务保留天数（<=0 表示不清理）。
 	ImportJobKeepDays int
+	// TombstoneKeepDays 是「已软删记录」的墓碑保留天数（<=0 表示不清理）。
+	//
+	// 软删记录留着是为了「万一还要找回来」；但没人读得到的墓碑
+	// 会一直占着堆与索引空间，把 base_records 撑大。
+	TombstoneKeepDays int
 	// Interval 是调度周期。
 	Interval time.Duration
 }
@@ -41,6 +46,7 @@ func DefaultMaintenanceConfig() MaintenanceConfig {
 		OutboxDeadKeepDays:   30,
 		OutboxMaxRetries:     5,
 		ImportJobKeepDays:    30,
+		TombstoneKeepDays:    30,
 		Interval:             time.Hour,
 	}
 }
@@ -103,6 +109,40 @@ func (s *Service) RunMaintenanceOnce(ctx context.Context) {
 	} else if n > 0 {
 		log.Printf("base maintenance: purged %d import jobs", n)
 	}
+	if n, err := s.PurgeTombstonedRecords(ctx, cfg.TombstoneKeepDays); err != nil {
+		log.Printf("base maintenance: purge tombstoned records failed: %v", err)
+	} else if n > 0 {
+		log.Printf("base maintenance: purged %d tombstoned records", n)
+	}
+}
+
+// PurgeTombstonedRecords 清理超期的「已软删记录」墓碑。
+//
+// 为什么需要：软删只打 deleted_at 标记，行还在表里。表被删掉之后
+// 这些记录永远没人读得到，却一直占着堆与索引空间 —— 实测压测跑几轮
+// 就能在 base_records 里堆出 40 多万条墓碑，把每一次记录扫描都拖慢。
+//
+// 保留策略：keepDays <= 0 时不删；只删 deleted_at 超过期限的行，
+// 连同它们的投影一起删（投影表比记录表还大）。
+func (s *Service) PurgeTombstonedRecords(ctx context.Context, keepDays int) (int64, error) {
+	if keepDays <= 0 {
+		return 0, nil
+	}
+	deadline := time.Now().AddDate(0, 0, -keepDays)
+	// 投影先删：它引用 record_id，记录删了就找不回来了。
+	if err := s.db.WithContext(ctx).Exec(
+		"DELETE FROM base_record_values WHERE record_id IN (SELECT id FROM base_records WHERE deleted_at IS NOT NULL AND deleted_at < ?)",
+		deadline,
+	).Error; err != nil && !isMissingTable(err) {
+		return 0, err
+	}
+	res := s.db.WithContext(ctx).Unscoped().
+		Where("deleted_at IS NOT NULL AND deleted_at < ?", deadline).
+		Delete(&BaseRecord{})
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
 }
 
 // ArchiveOperationLogs 归档（清理）超期的操作审计。
