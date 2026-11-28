@@ -164,9 +164,9 @@
       ⚠️ **必须排在 P-05 之后**，否则事件风暴直接打爆通道。
 - [ ] **A-02　事件体带字段增量值**（现在只广播「哪些字段变了」）
       配合已有的 `?since=` 增量回放（`handler.go:1384`），做「字段级增量」。
-- [ ] **A-03　视图个人偏好支持 OR / 多级合并**
+- [x] **A-03　视图个人偏好支持 OR / 多级合并** ✅ 已落地：个人段 `query.combine` 支持 `override / and / or` 三种口径（`viewQuery.ts::resolveFilters`），前端「仅我 + 任一满足」即 OR 叠加；多级合并由 `FilterGroup.children` 递归表达
       现在只有「AND」或「个人优先、空回落共享」（`viewQuery.ts:120-123`）。
-- [ ] **A-04　链接目标候选分页 + 远程搜索**
+- [x] **A-04　链接目标候选分页 + 远程搜索** ✅ 已落地：`GET /tables/:tableId/link-targets` 支持 `keyword` 模糊搜索 + `cursor` keyset 翻页（`relations.go::ListLinkTargetsPage`），前端 `listLinkTargetsPage` 游标加载
       现在一次最多 200 条，无游标、无模糊搜索。
 - [x] **A-05　审计 change set** ✅ 本轮完成
       审计原来只存 before / after 两份**完整快照**，看不出「到底改了哪几个字段」。
@@ -182,26 +182,26 @@
       - 引用 / 汇总字段的跨表依赖**落库**到 `base_formula_dependencies`
         （`dependency_type = 'lookup' / 'rollup'`），字段增删改时维护、启动时回填；
       - 反查改成一条索引查询（`dependentTableIDs`）。
-- [ ] **A-07　记录级授权的部门来源**
+- [x] **A-07　记录级授权的部门来源** ✅ 已落地：新增 `subject_type = 'group'` 授权 —— 指向真实的通讯录分组 `base_user_groups`（组内成员全部可见），并校验分组必须存在于本空间（`datascope.go::userGroupExists` / `userGroupIDs`）；建记录时也可直接带授权名单
       `base_record_grants.subject_type = department` 已支持，
       但部门名是「派生伪 ID」，没有真实组织架构联动。
-- [ ] **A-08　CSV 导入的行级失败重试**
+- [x] **A-08　CSV 导入的行级失败重试** ✅ 已落地：`BaseImportDialog.vue` 支持「重试失败行」与「行内修正后重试」两种模式
       现在按整行映射重放，不支持行级改值后重试。
-- [ ] **A-09　XLSX 导出的样式保真**
+- [x] **A-09　XLSX 导出的样式保真** ✅ 已落地：xlsx 生成器新增列级数字格式（金额 `¥#,##0.00` / 百分比 `0.00%` / 数字千分位右对齐 / 日期文本），保留冻结首行与列宽（`export/xlsx.ts` + `XLSX_STYLE`）
       导出是零依赖 SpreadsheetML，条件格式 / 冻结 / 颜色都没带出。
 
 ---
 
 ## 四、P2 · 体验（⚪）
 
-- [ ] **E-01　粘贴按字段类型智能解析**（现在整格覆盖）
-- [ ] **E-02　批量多选拖拽排序**（看板 / 日历单条拖拽已做）
-- [ ] **E-03　跨表拖拽记录**（画廊内拖拽已做）
+- [x] **E-01　粘贴按字段类型智能解析** ✅ 已落地：`clipboard.ts::parseCellValue` 按字段类型解析（数字去千分位与货币符号 / 布尔认中英文 / 日期归一化 / 多选拆分），解析不出来原样保留不静默改写；公式等只读列跳过
+- [x] **E-02　批量多选拖拽排序** ✅ 已落地：看板卡片可勾选，拖任意一张即整批挪列（`BaseBoardViews.vue`）；表格视图沿用既有多选拖拽排序
+- [x] **E-03　跨表拖拽记录** ✅ 已落地：实现为「跨表复制 / 移动」—— 单元格右键「复制 / 移动到其他表」，按**字段名**映射、只搬同类型字段（`POST /tables/:tableId/records/transfer`，`internal/base/transfer.go`）
 - [ ] **E-04　附件安全**：病毒扫描 + 类型白名单（现在只有扩展名黑名单）
-- [ ] **E-05　`ViewConfig.version` 二选一收口**（删字段 or 补落库，别留半截语义）
-- [ ] **E-06　Slash Command / Bubble Menu 等价物**
+- [x] **E-05　`ViewConfig.version` 二选一收口** ✅ 已落地：选择「补落库」—— 服务端每次保存视图配置把新的行版本写进 `config.version`（`service.go::CreateView / UpdateView`），前端 `ViewConfig.version` 类型同步
+- [x] **E-06　Slash Command / Bubble Menu 等价物** ✅ 已落地：文本类单元格敲「/」唤出命令面板（插入日期 / 时间 / 日期时间、转大小写、去空格、插链接、清空），选中文本浮出快捷工具条（复制 / 转大写 / 转小写 / 加链接 / 清空）；命令逻辑在 `fields/slashCommands.ts` 并有单测
       先出决策再动手：Base 的主操作面是表格，收益低于文档侧。
-- [ ] **E-07　汇总行 / 列计算**（当前视图只有明细行，没有「按分组求和」的汇总带）
+- [x] **E-07　汇总行 / 列计算** ✅ 已落地：新增 `POST /tables/:tableId/summary`（口径与列表一致：同一套筛选 + 关键字 + 可见范围），底部合计行（合计 / 平均 / 计数）+ 分组小计行插在每个分组之后
 
 ---
 
@@ -272,9 +272,16 @@
 - [ ] **P-03（排序 / 分组的 JOIN 数上限）未做**：后端已有 `MaxSorts=5 / MaxGroups=3` 的硬校验，
       两段式查询改造成本高，本轮保留现状。
 - [x] ~~P-07 只做了一半~~ —— **本轮完成**（N+1 断言已补）。
-- [ ] **A-01 ~ A-04 / A-07 ~ A-09 / E-01 ~ E-07 未做**（SSE→WS、字段级增量、
-      链接分页、CSV 行级重试、XLSX 样式保真、粘贴智能解析、批量拖拽排序、跨表拖拽、
-      附件安全、汇总行等），属于能力面扩展，需要单独排期。
+- [x] ~~**A-01 ~ A-04 / A-07 ~ A-09 / E-01 ~ E-07 未做**~~ —— **本轮已补齐**：
+      A-03（偏好 OR 口径）、A-04（链接候选分页 + 远程搜索）、A-07（分组授权）、
+      A-08（CSV 行级重试）、A-09（XLSX 样式保真）、E-01（粘贴智能解析）、
+      E-02（批量拖拽）、E-05（配置版本收口）、E-06（斜杠命令 / 浮动工具条）、
+      E-07（汇总行 / 分组小计）。
+- [ ] **仍未做 / 明确不做**：
+      - A-01（SSE → WebSocket 平移）：协议已兼容，但按既定取舍**保持 SSE**；
+      - A-02（事件体带字段增量值）：**刻意不做** —— 事件广播带值会绕过字段级权限（隐藏字段泄露），
+        现状是只广播「哪些字段变了」，增量靠 `?since=` 补偿接口；
+      - E-04（附件病毒扫描）：扩展名黑名单与类型校验已做，真实扫描需要外部服务（ClamAV 等），本轮未引入。
 - [ ] **远端库未同步**：本轮新增的索引（`uniq_base_record_values_record_field` /
       `idx_base_dep_dependency_table` / `idx_base_field_target_table` /
       `uniq_base_dep_formula_field_type`）与 `change_set` 列只在**本地开发库**生效；

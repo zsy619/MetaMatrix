@@ -26,7 +26,31 @@ export type XlsxSheet = {
   rows: XlsxCellValue[][];
   /** 列宽（字符数），可选。 */
   columnWidths?: number[];
+  /**
+   * 列级数字格式（A-09 样式保真）。
+   *
+   * 原来导出的金额 / 百分比 / 数字全是「裸值」：Excel 打开后要自己重新设格式，
+   * 金额列不带货币符号、百分比列显示 0.85 而不是 85%。
+   * 这里按列指定样式下标（见 styles.ts 的 STYLE_* 常量）。
+   */
+  columnStyles?: number[];
 };
+
+/** 单元格样式下标（与 styles.xml 的 cellXfs 顺序一一对应）。 */
+export const XLSX_STYLE = {
+  /** 常规。 */
+  general: 0,
+  /** 表头（加粗 + 浅灰底）。 */
+  header: 1,
+  /** 金额：¥1,200.00。 */
+  currency: 2,
+  /** 百分比：85.00%。 */
+  percent: 3,
+  /** 数字：1,200.00（右对齐）。 */
+  number: 4,
+  /** 日期：yyyy-mm-dd（文本）。 */
+  date: 5,
+} as const;
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -236,7 +260,12 @@ function buildSheetXml(sheet: XlsxSheet): string {
     const cells: string[] = [];
     row.forEach((value, colIndex) => {
       const ref = `${columnLetter(colIndex)}${rowIndex + 1}`;
-      const style = rowIndex === 0 ? ' s="1"' : "";
+      // 样式下标：表头固定 1；数据行走列级样式（没有则常规）。
+      const styleIndex =
+        rowIndex === 0
+          ? XLSX_STYLE.header
+          : (sheet.columnStyles?.[colIndex] ?? XLSX_STYLE.general);
+      const style = styleIndex ? ` s="${styleIndex}"` : "";
       if (value === null || value === undefined || value === "") {
         cells.push(`<c r="${ref}"${style}/>`);
         return;
@@ -260,14 +289,20 @@ function buildSheetXml(sheet: XlsxSheet): string {
   return parts.join("");
 }
 
-/** 最小样式表：0 = 常规，1 = 表头（加粗 + 浅灰底）。 */
+/**
+ * 样式表（A-09 样式保真）。
+ *
+ * 0 常规 · 1 表头 · 2 金额 · 3 百分比 · 4 数字（右对齐）· 5 日期（文本居左）。
+ * 自定义 numFmt 从 164 起（0~163 是 Excel 内置区间，不能占用）。
+ */
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="3"><numFmt numFmtId="164" formatCode="&quot;¥&quot;#,##0.00"/><numFmt numFmtId="165" formatCode="0.00%"/><numFmt numFmtId="166" formatCode="#,##0.00"/></numFmts>
 <fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
 <fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>
+<cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>
 </styleSheet>`;
 
 /**

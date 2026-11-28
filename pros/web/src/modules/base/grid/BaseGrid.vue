@@ -30,6 +30,7 @@ import {
   Plus,
   Tickets,
   Sort,
+  Connection,
   Unlock,
   Operation,
   Rank,
@@ -40,7 +41,14 @@ import BaseColumnMenu from "./BaseColumnMenu.vue";
 import { fieldTypeIcon } from "../fields/icons";
 import { fieldPlugin } from "../fields/registry";
 import { buildPasteCells, cellToText } from "../clipboard";
-import type { FieldMeta, RecordRow, SortRule } from "../types";
+import type {
+  FieldMeta,
+  RecordRow,
+  SortRule,
+  SummaryGroup,
+  SummaryResult,
+  SummaryValue,
+} from "../types";
 import { isComputedField, isSnapshotField } from "../fields/registry";
 
 const props = defineProps<{
@@ -72,6 +80,16 @@ const props = defineProps<{
   sorts?: SortRule[];
   /** 空间 ID：关联记录远程搜索用。 */
   projectId?: string;
+  /**
+   * 汇总结果（E-07 汇总行 / 分组小计）。
+   *
+   * 为空 = 不显示汇总带。
+   */
+  summary?: SummaryResult | null;
+  /** 分组小计的分组字段 ID（决定小计行插在哪个分组后面）。 */
+  summaryGroupFieldId?: string;
+  /** 汇总口径：sum = 合计，avg = 平均，count = 计数。 */
+  summaryFunction?: "sum" | "avg" | "count";
 }>();
 
 /** 该字段是否因「条件可见」策略而对本行隐藏。 */
@@ -108,6 +126,8 @@ const emit = defineEmits<{
     },
   ): void;
   (e: "selection-change", ids: string[]): void;
+  /** 跨表复制 / 移动记录（E-03）。 */
+  (e: "transfer-record", recordId: string): void;
   /**
    * 批量拖拽排序：把选中的若干行拖到目标行之前 / 之后。
    * ids 是被拖动的行 ID（保持它们当前的相对顺序），targetId + position 决定落点。
@@ -279,7 +299,9 @@ function applyPaste(text: string) {
     fields: visibleFields.value,
     startRow: row,
     startCol: col,
-    isReadonly: (fieldId) => fieldOf(fieldId)?.type === "formula",
+    // 不可写的列直接跳过：公式 / 引用 / 汇总 / 系统字段（创建时间、创建人等）。
+    // 粘贴进去不会生效，还会让人以为写进去了。
+    isReadonly: (fieldId) => isComputedField(fieldOf(fieldId)?.type ?? ""),
   });
   for (const cell of cells) {
     emit("update-cell", {
@@ -606,11 +628,106 @@ function fieldTypeLabel(type: string): string {
 }
 
 const gridData = computed(() =>
-  props.rows.map((row) => ({
-    ...row,
-    __id: row.id,
-  })),
+  withGroupSummaryRows(
+    props.rows.map((row) => ({
+      ...row,
+      __id: row.id,
+    })),
+  ),
 );
+
+/**
+ * 把「分组小计行」插到每个分组的最后一行之后（E-07）。
+ *
+ * 为什么要插行而不是只画一条底部合计：
+ * 分组视图里用户最常问的是「这一组一共多少」，
+ * 光有底部总计看不出分组之间的差异。
+ */
+function withGroupSummaryRows(
+  rows: Array<RecordRow & { __id: string }>,
+): Array<RecordRow & { __id: string; __summary?: SummaryGroup }> {
+  const groups = props.summary?.groups ?? [];
+  const groupFieldId = props.summaryGroupFieldId;
+  if (!groupFieldId || !groups.length) return rows;
+  const out: Array<RecordRow & { __id: string; __summary?: SummaryGroup }> = [];
+  rows.forEach((row, index) => {
+    out.push(row);
+    const next = rows[index + 1];
+    const key = row.group ?? "";
+    if (next && (next.group ?? "") === key) return;
+    const group = groups.find((item) => item.key === key);
+    if (!group) return;
+    out.push({
+      ...row,
+      id: `__summary__${key}`,
+      __id: `__summary__${key}`,
+      fields: {},
+      __summary: group,
+    } as RecordRow & { __id: string; __summary?: SummaryGroup });
+  });
+  return out;
+}
+
+/** 汇总口径（合计 / 平均 / 计数）。 */
+const summaryFunction = computed(() => props.summaryFunction ?? "sum");
+
+/** 取某字段的汇总值。 */
+function summaryValueOf(
+  values: SummaryValue[] | undefined,
+  fieldId: string,
+): SummaryValue | undefined {
+  return values?.find((item) => item.fieldId === fieldId);
+}
+
+/** 数字格式化：金额带符号、百分比带 %、其余保留两位小数。 */
+function formatSummaryNumber(field: FieldMeta, value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  if (field.type === "currency") {
+    return `¥${rounded.toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
+  }
+  if (field.type === "percent") return `${rounded}%`;
+  return rounded.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+}
+
+/**
+ * 一列的汇总文本。
+ *
+ * 数字类按口径显示（合计 / 平均）；其余类型显示「非空 / 空」的计数，
+ * 例如「12 / 3」表示 12 个有值、3 个空值 —— 比显示一个没意义的「合计 12」诚实。
+ */
+function summaryTextOf(
+  values: SummaryValue[] | undefined,
+  field: FieldMeta,
+): string {
+  const value = summaryValueOf(values, field.id);
+  if (!value) return "";
+  if (NUMERIC_TYPES.has(field.type)) {
+    if (summaryFunction.value === "avg") {
+      return value.avg === undefined ? "" : formatSummaryNumber(field, value.avg);
+    }
+    if (summaryFunction.value === "count") return String(value.count);
+    return value.sum === undefined ? "" : formatSummaryNumber(field, value.sum);
+  }
+  if (summaryFunction.value === "count") return String(value.count);
+  return `${value.filled} / ${value.empty}`;
+}
+
+/** 底部合计行（vxe 的 footerMethod）。 */
+function footerMethod() {
+  const summary = props.summary;
+  if (!summary) return [];
+  const label =
+    summaryFunction.value === "avg"
+      ? "平均"
+      : summaryFunction.value === "count"
+        ? "计数"
+        : "合计";
+  const cells: string[] = ["", `${label} · 共 ${summary.total} 条`];
+  visibleFields.value.forEach((field) => {
+    cells.push(summaryTextOf(summary.values, field));
+  });
+  return [cells];
+}
 
 function fieldOf(fieldId: string): FieldMeta | undefined {
   return props.fields.find((item) => item.id === fieldId);
@@ -812,6 +929,15 @@ const ctxItems = computed<CtxItem[]>(() => {
       run: () => ctxOpenRecord(),
     },
     {
+      key: "transfer",
+      label: "复制 / 移动到其他表",
+      icon: Connection,
+      run: () => {
+        const recordId = ctxMenu.value?.recordId ?? "";
+        if (recordId) emit("transfer-record", recordId);
+      },
+    },
+    {
       key: "asc",
       label: "按此列升序",
       icon: CaretTop,
@@ -951,6 +1077,8 @@ function ctxOpenRecord() {
       size="small"
       :row-config="{ isHover: true, isCurrent: true }"
       :scroll-y="{ enabled: true, gt: 40 }"
+      :show-footer="!!summary"
+      :footer-method="footerMethod"
       height="100%"
     >
       <!-- 空态（飞书：灰图标 + 文案 + 主行动按钮） -->
@@ -1084,6 +1212,7 @@ function ctxOpenRecord() {
       </template>
       <template #select="{ row }">
         <div
+          v-if="!row.__summary"
           class="base-grid__select"
           :class="{
             'is-dragging': dragRowIds.includes(row.id),
@@ -1112,15 +1241,31 @@ function ctxOpenRecord() {
             <el-icon><Rank /></el-icon>
           </span>
         </div>
+        <!-- 分组小计行不是记录，不可勾选。 -->
+        <div v-else class="base-grid__select base-grid__select--summary" />
       </template>
       <template #cell="{ row, column }">
         <div
           class="base-grid__cell"
+          :class="{ 'is-summary': !!row.__summary }"
           @click.stop="focusCell(row.id, column.field)"
           @dblclick.stop="focusCell(row.id, column.field)"
           @contextmenu.prevent="onCellContextMenu($event, row, column.field)"
         >
+          <!-- 分组小计行：只显示聚合值，不可编辑。 -->
+          <span
+            v-if="row.__summary"
+            class="base-grid__summary-cell"
+            :title="`分组「${row.__summary.key}」的小计（${row.__summary.count} 条）`"
+          >
+            {{
+              column.field === summaryGroupFieldId
+                ? `小计 · ${row.__summary.key}`
+                : summaryTextOf(row.__summary.values, fieldFor(column.field))
+            }}
+          </span>
           <BaseFieldCell
+            v-else
             :field="fieldFor(column.field)"
             :model-value="row.fields?.[column.field]"
             :editable="
@@ -1188,6 +1333,25 @@ function ctxOpenRecord() {
 </template>
 
 <style scoped>
+/* 分组小计行：整行加浅底 + 上边线，视觉上与明细行区分。 */
+.base-grid__cell.is-summary {
+  background: var(--tg-surface-2, #f6f8fa);
+  font-weight: 600;
+  color: var(--tg-text-1, #1f2937);
+}
+
+.base-grid__summary-cell {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.base-grid__select--summary {
+  min-height: 20px;
+}
+
 .base-grid__detail-wrap {
   display: inline-flex;
   align-items: center;

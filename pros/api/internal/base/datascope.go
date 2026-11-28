@@ -63,7 +63,7 @@ func (s *Service) recordScopeAllows(rec BaseRecord, userID, projectID uuid.UUID)
 		return true
 	}
 	if rec.Visibility == RecordVisibilityCustom {
-		return s.hasRecordGrant(rec.ID, userID)
+		return s.hasRecordGrant(rec.ID, userID, projectID)
 	}
 	return false
 }
@@ -82,22 +82,66 @@ func (s *Service) userDepartment(userID uuid.UUID) string {
 	return strings.TrimSpace(u.Department)
 }
 
+// userGroupExists 判断分组是否存在（且属于该空间、启用）。
+func (s *Service) userGroupExists(ctx context.Context, projectID uuid.UUID, groupID string) (bool, error) {
+	gid, err := uuid.Parse(groupID)
+	if err != nil {
+		return false, fmt.Errorf("%w: 分组 ID 非法", ErrFieldValueInvalid)
+	}
+	if !s.db.Migrator().HasTable(&BaseUserGroup{}) {
+		return false, nil
+	}
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&BaseUserGroup{}).
+		Where("id = ? AND project_id = ? AND status = 1", gid, projectID).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// userGroupIDs 返回用户所属的通讯录分组 ID（base_user_groups）。
+//
+// 取不到（表不存在 / 用户不在任何组）时返回空切片，不影响其它授权方式。
+func (s *Service) userGroupIDs(userID, projectID uuid.UUID) []string {
+	if userID == uuid.Nil {
+		return nil
+	}
+	if !s.db.Migrator().HasTable(&BaseUserGroup{}) {
+		return nil
+	}
+	var rows []BaseUserGroup
+	if err := s.db.
+		Where("project_id = ? AND status = 1", projectID).
+		Where("members @> ?::jsonb", `"`+userID.String()+`"`).
+		Find(&rows).Error; err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.ID.String())
+	}
+	return out
+}
+
 // hasRecordGrant 判断用户是否在某条记录的授权名单里。
 //
 // 命中条件（任一）：
 //   - 直接授权给该用户（subject_type = user）；
 //   - 授权给该用户所属部门（subject_type = department，按 core_users.department 匹配）；
 //   - 授权已过期（expires_at <= now）→ 不命中。
-func (s *Service) hasRecordGrant(recordID, userID uuid.UUID) bool {
+func (s *Service) hasRecordGrant(recordID, userID, projectID uuid.UUID) bool {
 	if recordID == uuid.Nil || userID == uuid.Nil {
 		return false
 	}
 	department := s.userDepartment(userID)
+	groupIDs := s.userGroupIDs(userID, projectID)
 	var count int64
 	if err := s.db.Model(&BaseRecordGrant{}).
 		Where("record_id = ? AND (expires_at IS NULL OR expires_at > ?)", recordID, time.Now()).
 		Where("(subject_type = 'user' AND user_id = ?) OR (subject_type = 'department' AND subject_id = ?)",
 			userID, department).
+		Where("(subject_type = 'group' AND subject_id IN ?)", groupIDs).
 		Count(&count).Error; err != nil {
 		return false
 	}
@@ -120,11 +164,18 @@ func (s *Service) applyRecordScope(q *gorm.DB, userID, projectID uuid.UUID, alia
 		prefix = alias + "."
 	}
 	// 注意：子查询里的表名**不能**带别名前缀（base_record_grants 在子查询里是主表）。
-	// 授权命中口径与 hasRecordGrant 保持一致：直接授权 / 部门授权 / 未过期。
+	// 授权命中口径与 hasRecordGrant 保持一致：直接授权 / 部门授权 / 分组授权 / 未过期。
 	// 部门名在 Go 侧解析（core_users 可能不存在于影子库），避免把 users 表写进 SQL。
 	department := s.userDepartment(userID)
-	return q.Where("("+prefix+"visibility = ? OR "+prefix+"created_by = ? OR "+prefix+"id IN (SELECT g.record_id FROM base_record_grants g WHERE (g.expires_at IS NULL OR g.expires_at > ?) AND ((g.subject_type = 'user' AND g.user_id = ?) OR (g.subject_type = 'department' AND g.subject_id = ?))))",
-		RecordVisibilitySpace, userID, time.Now(), userID, department)
+	grantCond := "((g.subject_type = 'user' AND g.user_id = ?) OR (g.subject_type = 'department' AND g.subject_id = ?))"
+	grantArgs := []any{userID, department}
+	// 分组授权（A-07）：用户所属的通讯录分组。
+	if groupIDs := s.userGroupIDs(userID, projectID); len(groupIDs) > 0 {
+		grantCond = "(" + grantCond + " OR (g.subject_type = 'group' AND g.subject_id IN ?))"
+		grantArgs = append(grantArgs, groupIDs)
+	}
+	return q.Where("("+prefix+"visibility = ? OR "+prefix+"created_by = ? OR "+prefix+"id IN (SELECT g.record_id FROM base_record_grants g WHERE (g.expires_at IS NULL OR g.expires_at > ?) AND "+grantCond+"))",
+		append([]any{RecordVisibilitySpace, userID, time.Now()}, grantArgs...)...)
 }
 
 // assertRecordVisible 校验当前用户能否读写某条记录；不可见时按「不存在」处理，
@@ -282,7 +333,21 @@ type GrantSubject struct {
 const (
 	GrantSubjectUser       = "user"
 	GrantSubjectDepartment = "department"
+	// GrantSubjectGroup 是「通讯录分组」授权（A-07）。
+	//
+	// 部门是 core_users 上的一个字符串字段（没有组织架构模型），
+	// 而 base_user_groups 是多维表格自己维护的真实分组（成员是 JSONB 数组）——
+	// 授权给一个组，组里所有人可见，比「按部门名匹配」可靠得多。
+	GrantSubjectGroup = "group"
 )
+
+// groupPseudoUserID 由分组 ID 派生一个稳定的伪用户 ID。
+//
+// base_record_grants 的唯一索引是 (record_id, user_id)，
+// 分组授权需要占一行，用派生 ID 既能复用索引，又不会和真实用户冲突。
+func groupPseudoUserID(groupID string) uuid.UUID {
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte("group:"+groupID))
+}
 
 // departmentPseudoUserID 由部门名派生一个稳定的伪用户 ID。
 //
@@ -304,8 +369,8 @@ func normalizeGrantSubjects(in *[]GrantSubject) ([]GrantSubject, error) {
 		if kind == "" {
 			kind = GrantSubjectUser
 		}
-		if kind != GrantSubjectUser && kind != GrantSubjectDepartment {
-			return nil, fmt.Errorf("%w: 授权对象类型只能是 user 或 department", ErrFieldValueInvalid)
+		if kind != GrantSubjectUser && kind != GrantSubjectDepartment && kind != GrantSubjectGroup {
+			return nil, fmt.Errorf("%w: 授权对象类型只能是 user / department / group", ErrFieldValueInvalid)
 		}
 		id := strings.TrimSpace(item.ID)
 		if id == "" {
@@ -314,6 +379,11 @@ func normalizeGrantSubjects(in *[]GrantSubject) ([]GrantSubject, error) {
 		if kind == GrantSubjectUser {
 			if _, err := uuid.Parse(id); err != nil {
 				return nil, fmt.Errorf("%w: 授权用户 ID 非法: %s", ErrFieldValueInvalid, id)
+			}
+		}
+		if kind == GrantSubjectGroup {
+			if _, err := uuid.Parse(id); err != nil {
+				return nil, fmt.Errorf("%w: 授权分组 ID 非法: %s", ErrFieldValueInvalid, id)
 			}
 		}
 		key := kind + "|" + id
@@ -383,6 +453,20 @@ func (s *Service) resolveGrantSubjects(ctx context.Context, projectID uuid.UUID,
 		if err != nil {
 			return nil, err
 		}
+		// 分组授权必须指向**本空间真实存在的分组**（A-07）：
+		// 否则授权行会落库但永远命中不到人（用户以为授权成功，其实谁也看不到）。
+		for _, subject := range subjects {
+			if subject.Type != GrantSubjectGroup {
+				continue
+			}
+			exists, err := s.userGroupExists(ctx, projectID, subject.ID)
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
+				return nil, fmt.Errorf("%w: 授权分组不存在", ErrFieldValueInvalid)
+			}
+		}
 		return &subjects, nil
 	}
 	if in.Grants == nil {
@@ -429,6 +513,8 @@ func (s *Service) saveRecordGrants(ctx context.Context, tx *gorm.DB, projectID, 
 		}
 		if subject.Type == GrantSubjectDepartment {
 			row.UserID = departmentPseudoUserID(subject.ID)
+		} else if subject.Type == GrantSubjectGroup {
+			row.UserID = groupPseudoUserID(subject.ID)
 		} else {
 			uid, _ := uuid.Parse(subject.ID)
 			row.UserID = uid
@@ -472,11 +558,26 @@ func (s *Service) ListRecordGrants(ctx context.Context, userID, projectID, recor
 		return out, nil
 	}
 	ids := make([]uuid.UUID, 0, len(rows))
+	groupIDs := make([]string, 0, len(rows))
 	for _, row := range rows {
-		if row.SubjectType == GrantSubjectDepartment {
+		switch row.SubjectType {
+		case GrantSubjectDepartment:
+			continue
+		case GrantSubjectGroup:
+			groupIDs = append(groupIDs, row.SubjectID)
 			continue
 		}
 		ids = append(ids, row.UserID)
+	}
+	// 分组名（分组授权要显示组名，而不是一串 UUID）。
+	groupNames := map[string]string{}
+	if len(groupIDs) > 0 && s.db.Migrator().HasTable(&BaseUserGroup{}) {
+		var groups []BaseUserGroup
+		if err := s.db.WithContext(ctx).Where("id IN ?", groupIDs).Find(&groups).Error; err == nil {
+			for _, group := range groups {
+				groupNames[group.ID.String()] = group.Name
+			}
+		}
 	}
 	names := map[uuid.UUID]model.User{}
 	var users []model.User
@@ -497,6 +598,14 @@ func (s *Service) ListRecordGrants(ctx context.Context, userID, projectID, recor
 		}
 		if entry.SubjectType == GrantSubjectDepartment {
 			entry.Name = "部门：" + row.SubjectID
+			out = append(out, entry)
+			continue
+		}
+		if entry.SubjectType == GrantSubjectGroup {
+			entry.Name = "分组：" + groupNames[row.SubjectID]
+			if groupNames[row.SubjectID] == "" {
+				entry.Name = "分组：" + row.SubjectID
+			}
 			out = append(out, entry)
 			continue
 		}

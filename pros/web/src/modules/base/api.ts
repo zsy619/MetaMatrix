@@ -24,6 +24,8 @@ import type {
   ViewConfig,
   ConfigBundle,
   ComputedFieldSummary,
+  SummaryRequest,
+  SummaryResult,
 } from './types'
 
 function baseUrl(projectId: string) {
@@ -424,6 +426,36 @@ export function queryRecords(projectId: string, payload: QueryRequest) {
     method: 'POST',
     body: payload,
   })
+}
+
+/** 跨表复制 / 移动记录（E-03）。 */
+export function transferRecord(
+  projectId: string,
+  tableId: string,
+  payload: { recordId: string; targetTableId: string; mode: "copy" | "move" },
+) {
+  return apiRequest<{
+    sourceRecordId: string;
+    targetTableId: string;
+    targetRecordId: string;
+    copiedFields: Record<string, string>;
+    skippedFields: Record<string, string>;
+  }>(`${baseUrl(projectId)}/tables/${tableId}/records/transfer`, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/**
+ * 计算视图的汇总行 / 分组小计（E-07）。
+ *
+ * 口径与列表一致：服务端用同一套筛选条件算，所以「合计」和列表永远对得上。
+ */
+export function fetchTableSummary(projectId: string, payload: SummaryRequest) {
+  return apiRequest<SummaryResult>(
+    `${baseUrl(projectId)}/tables/${payload.tableId}/summary`,
+    { method: 'POST', body: payload },
+  )
 }
 
 /** 列出视图。 */

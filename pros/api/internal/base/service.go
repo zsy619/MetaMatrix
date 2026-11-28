@@ -1570,6 +1570,8 @@ func (s *Service) createRecord(ctx context.Context, userID, projectID, tableID u
 type preparedRecord struct {
 	normalized map[string]any
 	visibility string
+	// grantSubjects 是「指定成员可见」的授权名单（建记录时一起给）。
+	grantSubjects *[]GrantSubject
 }
 
 // prepareRecord 做写入前的归一化与校验（不碰事务）。
@@ -1609,7 +1611,64 @@ func (s *Service) prepareRecord(
 		}
 		visibility = v
 	}
-	return &preparedRecord{normalized: normalized, visibility: visibility}, nil
+	// 授权名单（指定成员可见）：建记录时也可以一起给，
+	// 不必「先建再改」—— 否则中间那一瞬间记录是「空间可见」的。
+	var grantSubjects *[]GrantSubject
+	if in.GrantSubjects != nil || in.Grants != nil {
+		subjects, err := s.resolveGrantSubjects(ctx, projectID, &in)
+		if err != nil {
+			return nil, err
+		}
+		if subjects != nil && len(*subjects) > 0 {
+			if roleRank(subject.role) < roleRank(RoleAdmin) {
+				return nil, fmt.Errorf("%w: 只有空间管理者可以设置记录可见成员", ErrForbidden)
+			}
+			if err := s.validateGrantSubjects(ctx, projectID, *subjects); err != nil {
+				return nil, err
+			}
+			grantSubjects = subjects
+		}
+	}
+	return &preparedRecord{normalized: normalized, visibility: visibility, grantSubjects: grantSubjects}, nil
+}
+
+// validateGrantSubjects 校验授权对象「真的存在」：
+//   - 用户必须是空间成员；
+//   - 部门必须是空间成员出现过的部门；
+//   - 分组必须是本空间启用中的通讯录分组。
+//
+// 校验不通过会给出「看起来生效、实际看不到」的假权限，必须拦。
+func (s *Service) validateGrantSubjects(ctx context.Context, projectID uuid.UUID, subjects []GrantSubject) error {
+	members, err := s.spaceMemberIDs(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	departments, err := s.spaceMemberDepartments(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	for _, subject := range subjects {
+		switch subject.Type {
+		case GrantSubjectDepartment:
+			if !departments[subject.ID] {
+				return fmt.Errorf("%w: 部门不在空间成员中: %s", ErrFieldValueInvalid, subject.ID)
+			}
+		case GrantSubjectGroup:
+			exists, err := s.userGroupExists(ctx, projectID, subject.ID)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return fmt.Errorf("%w: 分组不存在: %s", ErrFieldValueInvalid, subject.ID)
+			}
+		default:
+			uid, parseErr := uuid.Parse(subject.ID)
+			if parseErr != nil || !members[uid] {
+				return fmt.Errorf("%w: 可见成员必须是空间成员", ErrFieldValueInvalid)
+			}
+		}
+	}
+	return nil
 }
 
 // persistRecord 把已校验的记录写进库（事务内）。
@@ -1667,6 +1726,12 @@ func (s *Service) persistRecord(
 		}
 		if err := s.syncRecordLinksWith(tx, io.table, io.idx, rec.ID, normalized, io.hasLinks); err != nil {
 			return err
+		}
+		// 授权名单（指定成员可见）：建记录时一并写入。
+		if prepared.grantSubjects != nil && len(*prepared.grantSubjects) > 0 {
+			if err := s.saveRecordGrants(ctx, tx, projectID, rec.ID, userID, *prepared.grantSubjects); err != nil {
+				return err
+			}
 		}
 		// 审计与事件先入缓冲，事务收尾时批量落库（往返数与行数脱钩）。
 		io.pendingAudits = append(io.pendingAudits, newAuditRow(
@@ -1806,28 +1871,10 @@ func (s *Service) updateRecord(ctx context.Context, userID, projectID, recordID 
 		return nil, fmt.Errorf("%w: 只有空间管理者可以修改记录可见成员", ErrForbidden)
 	}
 	if grantSubjects != nil && len(*grantSubjects) > 0 {
-		// 只能授权给「空间内的人 / 空间内存在的部门」：
-		// 给外人或不存在���部门授权属于看起来生效、实际无效的假权限。
-		members, err := s.spaceMemberIDs(ctx, projectID)
-		if err != nil {
+		// 只能授权给「空间内的人 / 空间内存在的部门 / 本空间存在的分组」：
+		// 给外人或不存在的东西授权属于看起来生效、实际无效的假权限。
+		if err := s.validateGrantSubjects(ctx, projectID, *grantSubjects); err != nil {
 			return nil, err
-		}
-		departments, err := s.spaceMemberDepartments(ctx, projectID)
-		if err != nil {
-			return nil, err
-		}
-		for _, subject := range *grantSubjects {
-			switch subject.Type {
-			case GrantSubjectDepartment:
-				if !departments[subject.ID] {
-					return nil, fmt.Errorf("%w: 部门不在空间成员中: %s", ErrFieldValueInvalid, subject.ID)
-				}
-			default:
-				uid, parseErr := uuid.Parse(subject.ID)
-				if parseErr != nil || !members[uid] {
-					return nil, fmt.Errorf("%w: 可见成员必须是空间成员", ErrFieldValueInvalid)
-				}
-			}
 		}
 	}
 	if newVisibility != "" && newVisibility != RecordVisibilityCustom && grantSubjects != nil && len(*grantSubjects) > 0 {
@@ -3016,6 +3063,9 @@ func (s *Service) CreateView(ctx context.Context, userID, projectID, tableID uui
 		return nil, err
 	}
 	shared, personal, _ := splitViewPersonal(config)
+	// 配置版本（E-05 收口）：config.version 与 base_views.version 对齐，
+	// 客户端拿到配置就能判断「这份配置是不是最新的」，不再靠猜。
+	shared["version"] = 1
 	raw, _ := json.Marshal(shared)
 	view := BaseView{
 		ID: uuid.New(), TenantID: projectID, TableID: tableID, Name: name, Type: viewType, Config: raw,
@@ -3081,6 +3131,8 @@ func (s *Service) UpdateView(ctx context.Context, userID, projectID, viewID uuid
 		shared, p, ok := splitViewPersonal(config)
 		personal, personalOK = p, ok
 		if canEditShared {
+			// 配置版本随行版本递增（E-05）：读到的 config.version 就是写它时的行版本。
+			shared["version"] = view.Version + 1
 			raw, _ := json.Marshal(shared)
 			updates["config"] = raw
 		}
