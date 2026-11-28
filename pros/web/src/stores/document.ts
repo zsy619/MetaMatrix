@@ -8,7 +8,7 @@ import { documentTabs, type DocumentSaveNotice } from './documentTabs'
 import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
 import { normalizePageMargin, writePageMargin, type PageMargin } from '../utils/rtePageMargin'
-import { normalizePageChrome, writePageChrome, type PanelPageChrome } from '../utils/rtePageChrome'
+import { normalizePageChrome, writePageChrome, type StoredPageChrome } from '../utils/rtePageChrome'
 import { readHeadingAutoNum, writeHeadingAutoNum } from '../utils/rteHeadingAutoNum'
 import { migrateToolbarGroupButtons, writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
 import { writeCommentThreads, type CommentThread } from '../utils/rteCommentThreads'
@@ -2294,7 +2294,7 @@ export const useDocumentStore = defineStore('document', () => {
     if (JSON.stringify(doc.headingAutoNumByPanelId ?? null) !== prev) markDirty()
   }
 
-  function setPanelPageChrome(panelId: string, chrome: PanelPageChrome) {
+  function setPanelPageChrome(panelId: string, chrome: StoredPageChrome) {
     const doc = current_data.value
     if (!doc || !panelId) return
     const normalized = normalizePageChrome(chrome)

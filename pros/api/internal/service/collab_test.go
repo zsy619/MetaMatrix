@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -972,4 +973,92 @@ func TestRestoreWritesSnapshotAndDropsAheadOps(t *testing.T) {
 	if report.LastSnapshotSeq != ops[0].Seq {
 		t.Fatalf("last snapshot seq = %d, want %d", report.LastSnapshotSeq, ops[0].Seq)
 	}
+}
+
+func TestInspectDualWriteReportsYjsStateDiverged(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = -1
+	title := "协同状态分叉"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := `<p data-block-id="cccccccc-cccc-4ccc-8ccc-cccccccccccc">对照正文</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0xAA},
+		HTML:    html,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// HTML 已双写，但 current_data 里的 yjsState 与最新 snapshot 不是同一份。
+	if err := db.Model(&model.CanvasDocument{}).Where("id = ?", doc.ID).Update("current_data", datatypes.JSON(
+		`{"type":"doc","html":`+jsonString(html)+`,"yjsState":"`+base64.StdEncoding.EncodeToString([]byte{0xBB})+`"}`,
+	)).Error; err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.CurrentHasYjsState || got.YjsStateMatchesSnapshot {
+		t.Fatalf("flags = %+v, want current has yjs and mismatch", got)
+	}
+	if got.Consistent || got.Reason != "yjs_state_diverged" {
+		t.Fatalf("inspect = %+v, want yjs_state_diverged", got)
+	}
+}
+
+func TestInspectDualWriteYjsMatchStaysInSync(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = -1
+	title := "协同状态一致"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := `<p data-block-id="dddddddd-dddd-4ddd-8ddd-dddddddddddd">同步正文</p>`
+	payload := []byte{0xAA}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: payload,
+		HTML:    html,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.CanvasDocument{}).Where("id = ?", doc.ID).Update("current_data", attachYjsState(datatypes.JSON(`{"type":"doc","html":`+jsonString(html)+`}`), payload)).Error; err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.CurrentHasYjsState || !got.YjsStateMatchesSnapshot {
+		t.Fatalf("flags = %+v, want matching yjs", got)
+	}
+	if !got.Consistent || got.Reason != "dual_write_in_sync" {
+		t.Fatalf("inspect = %+v, want dual_write_in_sync", got)
+	}
+}
+
+func jsonString(s string) string {
+	raw, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	return string(raw)
 }
