@@ -231,15 +231,113 @@ def remote_comments(url: str, password: str) -> set[str]:
     return {row for row in psql(url, sql, password).splitlines() if row}
 
 
+COLUMN_SNAPSHOT_SQL = """
+select c.relname||'|'||a.attname||'|'||format_type(a.atttypid,a.atttypmod)||'|'
+       ||coalesce(pg_get_expr(d.adbin,d.adrelid),'')||'|'
+       ||case when a.attnotnull then 'NOT NULL' else '' end
+from pg_class c
+join pg_namespace n on n.oid=c.relnamespace
+join pg_attribute a on a.attrelid=c.oid and a.attnum>0 and not a.attisdropped
+left join pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+where n.nspname='public' and c.relkind='r'
+order by c.relname, a.attname
+"""
+
+
+def columns_snapshot(url: str, password: str = "") -> dict[str, dict[str, dict[str, str]]]:
+    """列级快照：{表: {列: {type, default, notnull}}}。"""
+    result: dict[str, dict[str, dict[str, str]]] = {}
+    for row in psql(url, COLUMN_SNAPSHOT_SQL, password).splitlines():
+        row = row.strip()
+        if not row or "|" not in row:
+            continue
+        parts = row.split("|")
+        if len(parts) < 5:
+            continue
+        table, column, coltype, default, notnull = parts[0], parts[1], parts[2], parts[3], parts[4]
+        result.setdefault(table, {})[column] = {
+            "type": coltype,
+            "default": default,
+            "notnull": notnull,
+        }
+    return result
+
+
+def remote_pk_tables(url: str, password: str) -> set[str]:
+    """已有主键的表集合（用于避免重复添加 PK 约束）。"""
+    sql = """
+    select c.relname from pg_class c
+    join pg_namespace n on n.oid=c.relnamespace
+    join pg_constraint con on con.conrelid=c.oid and con.contype='p'
+    where n.nspname='public'
+    """
+    return {row.strip() for row in psql(url, sql, password).splitlines() if row.strip()}
+
+
+def remote_index_shapes(url: str, password: str) -> set[tuple[str, bool, str]]:
+    """已有索引的形状：{表: (是否唯一, 逗号分隔的列)}。"""
+    sql = """
+    select c.relname||'|'||case when i.indisunique then 'U' else 'I' end||'|'
+           ||(select string_agg(a.attname, ',' order by k.ord)
+              from unnest(i.indkey) with ordinality as k(attnum, ord)
+              join pg_attribute a on a.attrelid=i.indrelid and a.attnum=k.attnum)
+    from pg_index i
+    join pg_class c on c.oid=i.indrelid
+    join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public'
+    """
+    shapes: set[tuple[str, bool, str]] = set()
+    for row in psql(url, sql, password).splitlines():
+        row = row.strip()
+        if not row or row.count("|") < 2:
+            continue
+        table, unique, cols = row.split("|", 2)
+        shapes.add((table, unique == "U", cols))
+    return shapes
+
+
 def plan(
     local_sql: str,
     inventory: dict[str, set[str]],
     defaults: dict[str, str],
     comments: set[str],
     remote_statements: str,
+    local_cols: dict[str, dict[str, dict[str, str]]] | None = None,
+    remote_cols: dict[str, dict[str, dict[str, str]]] | None = None,
+    remote_pks: set[str] | None = None,
+    remote_shapes: set[tuple[str, bool, str]] | None = None,
 ) -> list[tuple[str, str]]:
     """产出需要下发的语句列表：(类别, SQL)。"""
     plan_items: list[tuple[str, str]] = []
+
+    # ---- 前置补列：pg_dump 只会为「本地新建的表」输出 ADD COLUMN，
+    # 远程已存在的表缺列时 dump 里根本没有对应语句，必须按列级快照补齐。
+    if local_cols and remote_cols:
+        for table, cols in local_cols.items():
+            if table not in remote_cols:
+                continue  # 整表本地独有，由建表语句负责
+            for column, meta in cols.items():
+                if column in remote_cols[table]:
+                    continue
+                piece = f"ALTER TABLE ONLY public.{table} ADD COLUMN IF NOT EXISTS {column} {meta['type']}"
+                if meta["default"]:
+                    piece += f" DEFAULT {meta['default']}"
+                plan_items.append(("加列", piece))
+
+    # ---- 远程缺默认值（列已存在）→ 补 SET DEFAULT（只影响后续写入，不动存量数据）
+    if local_cols and remote_cols:
+        for table, cols in local_cols.items():
+            if table not in remote_cols:
+                continue
+            for column, meta in cols.items():
+                if column not in remote_cols[table] or not meta["default"]:
+                    continue
+                remote_default = remote_cols[table][column]["default"]
+                if normalize_default(remote_default) != normalize_default(meta["default"]):
+                    plan_items.append(
+                        ("设默认值", f"ALTER TABLE ONLY public.{table} ALTER COLUMN {column} SET DEFAULT {meta['default']}")
+                    )
+
     for stmt in split_statements(local_sql):
         upper = stmt.upper()
         set_default = RE_SET_DEFAULT.match(stmt)
@@ -270,7 +368,14 @@ def plan(
 
         m = RE_CREATE_INDEX.match(stmt)
         if m:
-            if m.group(2) not in inventory["index"]:
+            same_name = m.group(2) in inventory["index"]
+            # 同表同列的等价索引（名字不同）也已存在 → 无需重复创建
+            equivalent = False
+            if remote_shapes:
+                cols_match = re.search(r"\(([^)]*)\)", stmt)
+                cols = cols_match.group(1).replace(" ", "") if cols_match else ""
+                equivalent = (m.group(3), bool(m.group(1)), cols) in remote_shapes
+            if not same_name and not equivalent:
                 stmt = re.sub(r"^CREATE (UNIQUE )?INDEX ", r"CREATE \1INDEX IF NOT EXISTS ", stmt)
                 plan_items.append(("建索引", stmt))
             continue
@@ -296,7 +401,11 @@ def plan(
 
         m = RE_ADD_CONSTRAINT.match(stmt)
         if m:
-            if m.group(2) not in inventory["constraint"]:
+            constraint_name = m.group(2)
+            if "PRIMARY KEY" in stmt.upper() and remote_pks and m.group(1) in remote_pks:
+                # 远程该表已有主键（只是名字不同）→ 不重复添加
+                continue
+            if constraint_name not in inventory["constraint"]:
                 plan_items.append(("加约束", stmt))
             continue
 
@@ -314,7 +423,15 @@ def plan(
                 plan_items.append(("加注释", stmt))
             continue
 
-    return plan_items
+    # 去重（保留顺序）：列级补齐与 dump 语句可能指向同一件事。
+    seen: set[tuple[str, str]] = set()
+    unique_items: list[tuple[str, str]] = []
+    for item in plan_items:
+        if item in seen:
+            continue
+        seen.add(item)
+        unique_items.append(item)
+    return unique_items
 
 
 def apply_statement(url: str, password: str, sql: str) -> tuple[bool, str]:
@@ -386,8 +503,22 @@ def main() -> int:
     inventory = remote_inventory(remote_url, remote_password)
     defaults = remote_defaults(remote_url, remote_password)
     comments = remote_comments(remote_url, remote_password)
+    local_cols = columns_snapshot(local_url)
+    remote_cols = columns_snapshot(remote_url, remote_password)
+    remote_pks = remote_pk_tables(remote_url, remote_password)
+    remote_shapes = remote_index_shapes(remote_url, remote_password)
 
-    items = plan(local_sql, inventory, defaults, comments, remote_sql)
+    items = plan(
+        local_sql,
+        inventory,
+        defaults,
+        comments,
+        remote_sql,
+        local_cols=local_cols,
+        remote_cols=remote_cols,
+        remote_pks=remote_pks,
+        remote_shapes=remote_shapes,
+    )
 
     # 差异摘要（忽略 pg_attver / \restrict 等噪声）。
     def norm(text: str) -> list[str]:
